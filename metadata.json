@@ -1,0 +1,6 @@
+{
+  "name": "GlowTales",
+  "description": "A calm, gentle storytelling platform that shapes personalized, comforting adventures celebrating the unique interests and superpowers of neurodivergent children.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
