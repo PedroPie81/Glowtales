@@ -69,6 +69,173 @@ export default function CreateStory() {
   // Custom narrative creation step
   const [activeFormStep, setActiveFormStep] = useState<"profile" | "comfort" | "format">("profile");
 
+  // ElevenLabs Audio Narration logic
+  const NARRATOR_VOICES = [
+    { id: "NOpBlnGInO9m6vDvFkFC", name: "George", gender: "Male", description: "Soothing & Gentle (British style)" },
+    { id: "21m00Tcm4TlvDq8ikWAM", name: "Rachel", gender: "Female", description: "Warm, Clear & Sunny" },
+    { id: "piYvOCg933Iba7ua6s1D", name: "Nicole", gender: "Female", description: "Soft & Whispery (highly sensitive)" },
+    { id: "ErXwobaYiN019vkySvjV", name: "Antoni", gender: "Male", description: "Quiet & Relaxed Storytaker" },
+    { id: "TX3LPax33XmUIP9m98vL", name: "Liam", gender: "Male", description: "Friendly, Gentle & Youthful" },
+    { id: "custom", name: "Custom Voice ID...", gender: "Voice Lab", description: "A voice you created in your Voice Lab account" }
+  ];
+
+  const [selectedVoice, setSelectedVoice] = useState("NOpBlnGInO9m6vDvFkFC"); // default George
+  const [customVoiceId, setCustomVoiceId] = useState("");
+  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [audioError, setAudioError] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
+
+  // Stop any playing audio on unmount or cleanup
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+    };
+  }, []);
+
+  const handleVoiceChange = (voiceId: string) => {
+    setSelectedVoice(voiceId);
+    // Reset previous audio so it generates freshly for the chosen voice
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    setAudioUrl(null);
+    setIsPlayingAudio(false);
+    setAudioCurrentTime(0);
+    setAudioDuration(0);
+    setAudioError(null);
+  };
+
+  const handleGenerateAudio = async () => {
+    if (!storyResult) return;
+
+    let voiceToUse = selectedVoice;
+    if (selectedVoice === "custom") {
+      const trimmedCustom = customVoiceId.trim();
+      if (!trimmedCustom) {
+        setAudioError("Please paste your Custom Voice ID first. (Find this in your ElevenLabs Voice Lab profile.)");
+        return;
+      }
+      voiceToUse = trimmedCustom;
+    }
+
+    setIsGeneratingAudio(true);
+    setAudioError(null);
+    setAudioUrl(null);
+    setIsPlayingAudio(false);
+    setAudioCurrentTime(0);
+    setAudioDuration(0);
+
+    try {
+      const response = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: storyResult.content,
+          voiceId: voiceToUse
+        })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || errData.instructions || "Failed to generate voice narration.");
+      }
+
+      const audioBlob = await response.blob();
+      const url = URL.createObjectURL(audioBlob);
+      setAudioUrl(url);
+
+      const audio = new Audio(url);
+      audioRef.current = audio;
+
+      audio.onloadedmetadata = () => {
+        setAudioDuration(audio.duration || 0);
+      };
+
+      audio.ontimeupdate = () => {
+        setAudioCurrentTime(audio.currentTime || 0);
+      };
+
+      audio.onended = () => {
+        setIsPlayingAudio(false);
+        setAudioCurrentTime(0);
+      };
+
+      audio.onerror = (e) => {
+        console.error("Audio playback error:", e);
+        setAudioError("Error playing back audio format.");
+        setIsPlayingAudio(false);
+      };
+
+      // Play immediately
+      await audio.play();
+      setIsPlayingAudio(true);
+
+    } catch (err: any) {
+      console.error("Error generating narration:", err);
+      setAudioError(err.message || "Failed to connect to narration service.");
+    } finally {
+      setIsGeneratingAudio(false);
+    }
+  };
+
+  const togglePlayPauseAudio = () => {
+    if (!audioRef.current) return;
+    if (isPlayingAudio) {
+      audioRef.current.pause();
+      setIsPlayingAudio(false);
+    } else {
+      audioRef.current.play().then(() => {
+        setIsPlayingAudio(true);
+      }).catch(err => {
+        console.error("Play failed:", err);
+      });
+    }
+  };
+
+  const handleRewindAudio = () => {
+    if (!audioRef.current) return;
+    const newTime = Math.max(0, audioRef.current.currentTime - 10);
+    audioRef.current.currentTime = newTime;
+    setAudioCurrentTime(newTime);
+  };
+
+  const handleForwardAudio = () => {
+    if (!audioRef.current) return;
+    const newTime = Math.min(audioDuration, audioRef.current.currentTime + 10);
+    audioRef.current.currentTime = newTime;
+    setAudioCurrentTime(newTime);
+  };
+
+  const handleStopAudio = () => {
+    if (!audioRef.current) return;
+    audioRef.current.pause();
+    audioRef.current.currentTime = 0;
+    setAudioCurrentTime(0);
+    setIsPlayingAudio(false);
+  };
+
+  const handleSeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseFloat(e.target.value);
+    setAudioCurrentTime(val);
+    if (audioRef.current) {
+      audioRef.current.currentTime = val;
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    if (isNaN(seconds) || seconds === Infinity) return "0:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+  };
+
   // Helper helper to handle form defaults or help triggers
   const fillSampleInterest = (interest: string, triggers: string = "") => {
     setFormData(prev => ({ ...prev, specialInterests: interest, triggers }));
@@ -91,6 +258,21 @@ export default function CreateStory() {
     setStoryResult(null);
     setGeneratingImages({});
     setImageErrors({});
+
+    // Stop and clear any active audio narration
+    if (audioRef.current) {
+      try {
+        audioRef.current.pause();
+      } catch (err) {
+        console.warn("Error pausing old audio:", err);
+      }
+      audioRef.current = null;
+    }
+    setAudioUrl(null);
+    setIsPlayingAudio(false);
+    setAudioCurrentTime(0);
+    setAudioDuration(0);
+    setAudioError(null);
 
     try {
       const response = await fetch("/api/generate-story", {
@@ -828,6 +1010,171 @@ export default function CreateStory() {
                   {storyResult.keyFeatures.sensoryLevel}
                 </span>
               </div>
+            </div>
+
+            {/* Audio Narration Controller Panel */}
+            <div className="bg-sky-50/30 rounded-2xl border border-sky-100 p-4 sm:p-5 space-y-4" id="audio-narration-player">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-sky-100/50">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-sky-100/60 rounded-xl text-sky-600">
+                    <Volume2 className="h-4.5 w-4.5 text-sky-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-800 font-sans tracking-wide">Audio Storybook Narration</h3>
+                    <p className="text-[10px] text-slate-400 font-sans">Listen to a comforting, gentle voice read the story</p>
+                  </div>
+                </div>
+                
+                {/* Voice Selection Configuration */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 shrink-0 select-none">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-bold text-slate-500 font-sans uppercase">Voice Option:</span>
+                    <select
+                      className="text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-slate-700 outline-none cursor-pointer hover:border-slate-300 font-sans font-medium"
+                      aria-label="Select Reader Voice"
+                      value={selectedVoice}
+                      onChange={(e) => handleVoiceChange(e.target.value)}
+                      disabled={isGeneratingAudio}
+                    >
+                      {NARRATOR_VOICES.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.name} ({v.gender})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {selectedVoice === "custom" && (
+                    <input
+                      type="text"
+                      placeholder="Paste your Voice ID (e.g., ErXwobaY...)"
+                      value={customVoiceId}
+                      onChange={(e) => setCustomVoiceId(e.target.value)}
+                      disabled={isGeneratingAudio}
+                      className="text-xs bg-white border border-sky-200 outline-none focus:border-sky-500 rounded-lg px-2.5 py-1 text-slate-700 font-mono w-56 placeholder:text-slate-300"
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Seeker slider timeline for the story */}
+              {audioUrl && (
+                <div className="space-y-1.5 bg-white/60 p-3 rounded-xl border border-sky-100/40" id="audio-seekbar-container">
+                  <div className="flex items-center justify-between text-[10px] font-mono mx-0.5 text-slate-500">
+                    <span>{formatTime(audioCurrentTime)}</span>
+                    <span className="font-semibold text-sky-700">
+                      {isPlayingAudio ? "Playing narration..." : "Paused"}
+                    </span>
+                    <span>{formatTime(audioDuration)}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={audioDuration || 100}
+                    value={audioCurrentTime}
+                    onChange={handleSeekChange}
+                    className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-sky-600 focus:outline-none transition-all"
+                    title="Drag to skip to different sections of the story"
+                  />
+                </div>
+              )}
+
+              {/* Control Action Panel Section */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="text-[10px] text-slate-500 font-sans max-w-sm">
+                  {audioUrl ? (
+                    <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      Narration active ({selectedVoice === "custom" ? `Custom Voice (${customVoiceId.trim() ? customVoiceId.trim().slice(0, 8) + '...' : 'Unspecified'})` : `${NARRATOR_VOICES.find(v => v.id === selectedVoice)?.name} - ${NARRATOR_VOICES.find(v => v.id === selectedVoice)?.description}`})
+                    </span>
+                  ) : (
+                    <span>Crafted with soft pace and calming tones to soothe and center busy minds. Requires your ElevenLabs API Key configured in your settings.</span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                  {audioUrl ? (
+                    <div className="flex items-center gap-1 bg-white border border-slate-150 p-1 rounded-xl shadow-xs">
+                      {/* Rewind 10 Seconds */}
+                      <button
+                        type="button"
+                        onClick={handleRewindAudio}
+                        className="cursor-pointer p-2 hover:bg-slate-50 text-slate-600 rounded-lg transition"
+                        title="Rewind 10 seconds"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                      </button>
+
+                      {/* Play / Pause Toggle */}
+                      <button
+                        type="button"
+                        onClick={togglePlayPauseAudio}
+                        className="cursor-pointer p-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition"
+                        title={isPlayingAudio ? "Pause Narration" : "Play Narration"}
+                      >
+                        {isPlayingAudio ? (
+                          <Pause className="h-4 w-4 text-white fill-white" />
+                        ) : (
+                          <Play className="h-4 w-4 fill-white text-white" />
+                        )}
+                      </button>
+
+                      {/* Stop & Reset Button */}
+                      <button
+                        type="button"
+                        onClick={handleStopAudio}
+                        className="cursor-pointer p-2 hover:bg-slate-55 text-rose-600 rounded-lg transition"
+                        title="Stop & Rewind to Start"
+                      >
+                        <Square className="h-4 w-4 fill-rose-100 text-rose-600" />
+                      </button>
+
+                      {/* Skip Forward 10 Seconds */}
+                      <button
+                        type="button"
+                        onClick={handleForwardAudio}
+                        className="cursor-pointer p-2 hover:bg-slate-50 text-slate-600 rounded-lg transition"
+                        title="Fast forward 10 seconds"
+                      >
+                        <SkipForward className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleGenerateAudio}
+                      disabled={isGeneratingAudio}
+                      className="cursor-pointer px-4 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition disabled:opacity-55 shadow-xs"
+                    >
+                      {isGeneratingAudio ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-white" /> Generating gentle voice...
+                        </>
+                      ) : (
+                        <>
+                          <Volume2 className="h-3.5 w-3.5 text-white" /> Generate Audio
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Exception notification bubble if error occurs */}
+              {audioError && (
+                <div className="bg-rose-50 border border-rose-100 rounded-xl p-3 text-xs text-rose-700 font-sans" id="audio-narration-failure">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 text-rose-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-rose-800">Could not start narration</p>
+                      <p className="mt-0.5 text-rose-600 font-light">{audioError}</p>
+                      <p className="mt-2 text-rose-600/90 leading-relaxed text-[11px]">
+                        <strong>To resolve:</strong> Please locate the **Settings / Secrets** panel in the bottom-left corner of the AI Studio workspace, add a new environment variable with name <code className="bg-rose-100/70 border border-rose-200 text-rose-800 px-1 py-0.5 rounded font-mono">ELEVENLABS_API_KEY</code>, paste your ElevenLabs API Key, and then click save. 
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Structured story sections */}
