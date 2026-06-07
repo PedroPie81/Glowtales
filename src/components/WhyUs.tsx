@@ -13,6 +13,7 @@ import {
   Heart
 } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 // For search engine optimizer transparency and semantic clarity
 interface SEOKeyword {
@@ -22,7 +23,7 @@ interface SEOKeyword {
   description: string;
 }
 
-export default function WhyUs({ onNavigate }: { onNavigate: (tab: string) => void }) {
+export default function WhyUs() {
   const [activeKeywordFilter, setActiveKeywordFilter] = useState<string>("All");
 
   // Rich SEO Target Phrases requested by user for search visibility
@@ -312,14 +313,14 @@ export default function WhyUs({ onNavigate }: { onNavigate: (tab: string) => voi
 
       {/* Dynamic CTA */}
       <div className="text-center pt-4">
-        <button
-          onClick={() => onNavigate("create")}
+        <Link
+          to="/create"
           className="cursor-pointer inline-flex items-center gap-2 rounded-2xl bg-sky-600 hover:bg-sky-700 text-white px-8 py-4 text-sm font-semibold shadow-sm transition active:scale-95"
           id="cta-whyus-start"
         >
           <span>Create an Adventure Instantly</span>
           <ArrowRight className="h-4 w-4" />
-        </button>
+        </Link>
       </div>
 
     </div>

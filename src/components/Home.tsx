@@ -1,11 +1,8 @@
 import { motion } from "motion/react";
 import { Sparkles, Heart, Brain, EyeOff, BookOpen, Compass } from "lucide-react";
+import { Link } from "react-router-dom";
 
-interface HomeProps {
-  onNavigate: (tab: string) => void;
-}
-
-export default function Home({ onNavigate }: HomeProps) {
+export default function Home() {
   const pillars = [
     {
       id: "lit-lang",
@@ -71,22 +68,22 @@ export default function Home({ onNavigate }: HomeProps) {
             transition={{ duration: 0.6, delay: 0.3 }}
             className="pt-4 flex flex-col sm:flex-row gap-4"
           >
-            <button
-              onClick={() => onNavigate("create")}
+            <Link
+              to="/create"
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-6 py-3.5 text-sm font-medium text-white shadow-sm transition hover:bg-sky-700 active:scale-98 cursor-pointer"
               id="cta-create-story"
             >
               <Sparkles className="h-4 w-4" />
               Create a Story Now
-            </button>
-            <button
-              onClick={() => onNavigate("examples")}
+            </Link>
+            <Link
+              to="/examples"
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-white border border-slate-200/80 px-6 py-3.5 text-sm font-medium text-slate-700 shadow-xs transition hover:bg-slate-50 active:scale-98 cursor-pointer"
               id="cta-view-examples"
             >
               <BookOpen className="h-4 w-4 text-slate-500" />
               Browse Example Tales
-            </button>
+            </Link>
           </motion.div>
         </div>
       </section>
@@ -131,9 +128,9 @@ export default function Home({ onNavigate }: HomeProps) {
             Discover how Peter designed this for his own family, or check how Willow Creek Station functions for Leo. Everything is modeled to reduce sensory noise and increase joy.
           </p>
           <div className="pt-2 flex flex-wrap gap-4 text-xs font-semibold text-indigo-600 font-sans">
-            <button onClick={() => onNavigate("why-us")} className="hover:underline font-bold text-sky-600 cursor-pointer">Why We are Free &rarr;</button>
-            <button onClick={() => onNavigate("how-it-works")} className="hover:underline cursor-pointer">Explore the Methodology &rarr;</button>
-            <button onClick={() => onNavigate("about")} className="hover:underline cursor-pointer">Read Peter's Story &rarr;</button>
+            <Link to="/why-us" className="hover:underline font-bold text-sky-600 cursor-pointer">Why We are Free &rarr;</Link>
+            <Link to="/how-it-works" className="hover:underline cursor-pointer">Explore the Methodology &rarr;</Link>
+            <Link to="/about" className="hover:underline cursor-pointer">Read Peter's Story &rarr;</Link>
           </div>
         </div>
       </section>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Sparkles, Compass, BookOpen, Clock, Heart, Menu, X, Star } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { Routes, Route, Link, Navigate, useLocation } from "react-router-dom";
 import Home from "./components/Home";
 import CreateStory from "./components/CreateStory";
 import Examples from "./components/Examples";
@@ -8,12 +9,11 @@ import HowItWorks from "./components/HowItWorks";
 import AboutUs from "./components/AboutUs";
 import WhyUs from "./components/WhyUs";
 
-type ACTIVE_TAB = "home" | "create" | "examples" | "how-it-works" | "about" | "why-us";
-
 export default function App() {
-  const [activeTab, setActiveTab] = useState<ACTIVE_TAB>("home");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState<string>("");
+  const location = useLocation();
+  const { pathname } = location;
 
   useEffect(() => {
     // Elegant real-time display (UTC) for neurodivergent predictability
@@ -26,40 +26,25 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  const handleNavigate = (tab: string) => {
-    setActiveTab(tab as ACTIVE_TAB);
-    setMobileMenuOpen(false);
-    // Smooth scroll to top for comfortable reading
+  // Smooth scroll to top on every route transition
+  useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  }, [pathname]);
 
   const menuItems = [
-    { id: "home", label: "Home" },
-    { id: "create", label: "Create a Story" },
-    { id: "examples", label: "Example Tales" },
-    { id: "how-it-works", label: "How It Works" },
-    { id: "about", label: "About Us" },
-    { id: "why-us", label: "Why Us" }
+    { id: "home", label: "Home", path: "/" },
+    { id: "create", label: "Create a Story", path: "/create" },
+    { id: "examples", label: "Example Tales", path: "/examples" },
+    { id: "how-it-works", label: "How It Works", path: "/how-it-works" },
+    { id: "about", label: "About Us", path: "/about" },
+    { id: "why-us", label: "Why Us", path: "/why-us" }
   ];
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case "home":
-        return <Home onNavigate={handleNavigate} />;
-      case "create":
-        return <CreateStory />;
-      case "examples":
-        return <Examples />;
-      case "how-it-works":
-        return <HowItWorks />;
-      case "about":
-        return <AboutUs />;
-      case "why-us":
-        return <WhyUs onNavigate={handleNavigate} />;
-      default:
-        return <Home onNavigate={handleNavigate} />;
-    }
-  };
+  // Derive the activeTab ID from the current pathname
+  const activeTab = menuItems.find(item => {
+    if (item.path === "/") return pathname === "/";
+    return pathname.startsWith(item.path);
+  })?.id || "home";
 
   return (
     <div className="min-h-screen bg-[#fafaf9] text-slate-800 flex flex-col antialiased selection:bg-sky-100 selection:text-sky-900" id="glowtales-root">
@@ -69,8 +54,8 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           
           {/* Logo & Brand ID */}
-          <div 
-            onClick={() => handleNavigate("home")}
+          <Link 
+            to="/"
             className="flex items-center gap-2 cursor-pointer group"
             id="brand-logo"
           >
@@ -80,14 +65,14 @@ export default function App() {
             <span className="text-lg font-bold tracking-tight font-sans text-slate-800">
               Glow<span className="text-sky-500 font-medium">Tales</span>
             </span>
-          </div>
+          </Link>
 
           {/* Desktop Nav Items */}
           <nav className="hidden md:flex items-center gap-1" id="desktop-routing-nav">
             {menuItems.map(item => (
-              <button
+              <Link
                 key={item.id}
-                onClick={() => handleNavigate(item.id)}
+                to={item.path}
                 className={`cursor-pointer px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold tracking-wide transition active:scale-95 ${
                   activeTab === item.id
                     ? "bg-sky-50 text-sky-600"
@@ -96,7 +81,7 @@ export default function App() {
                 id={`nav-item-${item.id}`}
               >
                 {item.label}
-              </button>
+              </Link>
             ))}
           </nav>
 
@@ -106,14 +91,14 @@ export default function App() {
               <Clock className="h-3 w-3" />
               <span>{currentTime || "09:28 UTC"}</span>
             </div>
-            <button
-              onClick={() => handleNavigate("create")}
+            <Link
+              to="/create"
               className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 text-xs font-semibold shadow-xs transition active:scale-95"
               id="header-cta-create"
             >
               <Sparkles className="h-3.5 w-3.5" />
               Create
-            </button>
+            </Link>
           </div>
 
           {/* Mobile hamburger menu toggle */}
@@ -142,9 +127,10 @@ export default function App() {
           >
             <div className="px-4 py-3 space-y-1">
               {menuItems.map(item => (
-                <button
+                <Link
                   key={item.id}
-                  onClick={() => handleNavigate(item.id)}
+                  to={item.path}
+                  onClick={() => setMobileMenuOpen(false)}
                   className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium block ${
                     activeTab === item.id
                       ? "bg-sky-50 text-sky-600 font-bold"
@@ -152,17 +138,18 @@ export default function App() {
                   }`}
                 >
                   {item.label}
-                </button>
+                </Link>
               ))}
               <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
                 <span className="text-[10px] font-mono text-slate-400">{currentTime}</span>
-                <button
-                  onClick={() => handleNavigate("create")}
+                <Link
+                  to="/create"
+                  onClick={() => setMobileMenuOpen(false)}
                   className="inline-flex items-center gap-1 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg"
                 >
                   <Sparkles className="h-3 w-3" />
                   Create
-                </button>
+                </Link>
               </div>
             </div>
           </motion.div>
@@ -172,15 +159,69 @@ export default function App() {
       {/* 2. Main Page Content frame with comfortable margins and animation */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.35, ease: "easeInOut" }}
-          >
-            {renderContent()}
-          </motion.div>
+          <Routes location={location} key={pathname}>
+            <Route path="/" element={
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.35, ease: "easeInOut" }}
+              >
+                <Home />
+              </motion.div>
+            } />
+            <Route path="/create" element={
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.35, ease: "easeInOut" }}
+              >
+                <CreateStory />
+              </motion.div>
+            } />
+            <Route path="/examples" element={
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.35, ease: "easeInOut" }}
+              >
+                <Examples />
+              </motion.div>
+            } />
+            <Route path="/how-it-works" element={
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.35, ease: "easeInOut" }}
+              >
+                <HowItWorks />
+              </motion.div>
+            } />
+            <Route path="/about" element={
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.35, ease: "easeInOut" }}
+              >
+                <AboutUs />
+              </motion.div>
+            } />
+            <Route path="/why-us" element={
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.35, ease: "easeInOut" }}
+              >
+                <WhyUs />
+              </motion.div>
+            } />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
         </AnimatePresence>
       </main>
 
@@ -193,9 +234,9 @@ export default function App() {
             <span>&copy; 2026 Peter's Family Project.</span>
           </div>
           <div className="flex gap-4">
-            <button onClick={() => handleNavigate("why-us")} className="hover:underline font-semibold text-sky-600">Why Us (Free)</button>
-            <button onClick={() => handleNavigate("how-it-works")} className="hover:underline">Methodology</button>
-            <button onClick={() => handleNavigate("about")} className="hover:underline">About peter</button>
+            <Link to="/why-us" className="hover:underline font-semibold text-sky-600">Why Us (Free)</Link>
+            <Link to="/how-it-works" className="hover:underline">Methodology</Link>
+            <Link to="/about" className="hover:underline">About Peter</Link>
             <a href="mailto:peteradamj@gmail.com" className="hover:underline">Support</a>
           </div>
         </div>
