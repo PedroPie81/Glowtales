@@ -48,10 +48,10 @@ function getGoogleGenAI(): GoogleGenAI {
 // Error formatter for Gemini interactions
 function handleGeminiError(error: any, context = "action") {
   console.error(`Gemini API Error in ${context}:`, error);
-  const errorString = String(error);
+  const errorString = String(error || "");
   
-  const isPermissionDenied = error.status === 403 || 
-                             error.statusCode === 403 || 
+  const isPermissionDenied = error?.status === 403 || 
+                             error?.statusCode === 403 || 
                              errorString.includes("insufficient authentication scopes") || 
                              errorString.includes("ACCESS_TOKEN_SCOPE_INSUFFICIENT") ||
                              errorString.includes("PERMISSION_DENIED");
@@ -68,8 +68,8 @@ function handleGeminiError(error: any, context = "action") {
     };
   }
 
-  const isRateLimit = error.status === 429 || 
-                      error.statusCode === 429 || 
+  const isRateLimit = error?.status === 429 || 
+                      error?.statusCode === 429 || 
                       errorString.includes("429") || 
                       errorString.toLowerCase().includes("rate limit") || 
                       errorString.toLowerCase().includes("quota");
@@ -84,7 +84,7 @@ function handleGeminiError(error: any, context = "action") {
 
   return {
     error: `We could not complete your ${context} request at this moment.`,
-    details: error.message || errorString,
+    details: error?.message || errorString,
     status: 500
   };
 }
@@ -94,8 +94,8 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1500): Pr
   try {
     return await fn();
   } catch (error: any) {
-    const errorString = String(error);
-    const status = error.status || error.statusCode || (error.response && error.response.status);
+    const errorString = String(error || "");
+    const status = error?.status || error?.statusCode || (error?.response && error?.response?.status);
     const isRetryable = status === 429 || status === 503 || errorString.includes("429") || errorString.includes("503") || errorString.toLowerCase().includes("rate");
     if (!isRetryable || retries <= 0) {
       throw error;
@@ -193,7 +193,7 @@ Every single image description inside 'suggestedIllustrations' MUST start exactl
 Your response must be JSON matching the schema, with the title, the content including the ${numImages} image markers ([IMAGE_1] to [IMAGE_${numImages}]) on separate lines, a description of the consistent physical appearance of ${name} (for characterAppearance), a description of the key focus objects (for objectAppearance), exactly ${numImages} distinct illustration descriptions in suggestedIllustrations matching the [IMAGE_1] to [IMAGE_${numImages}] points, and the keyFeatures tags.`;
 
     const response = await withRetry(() => getGoogleGenAI().models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash",
       contents: prompt,
       config: {
         systemInstruction,
@@ -396,7 +396,12 @@ async function startServer() {
     app.use(express.static(distPath));
     // SPA fallback
     app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      res.sendFile(path.join(distPath, 'index.html'), (err) => {
+        if (err) {
+          console.error("Error sending index.html in production routing fallback:", err);
+          res.status(500).send("Your GlowTales application is loading, please try refreshing in a moment.");
+        }
+      });
     });
   }
 
