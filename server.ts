@@ -365,7 +365,10 @@ app.post("/api/generate-image", async (req, res) => {
 
 // Vite Integration and Host Static files in Production
 async function startServer() {
-  if (process.env.NODE_ENV !== "production") {
+  const isProduction = process.env.NODE_ENV === "production" ||
+                       !process.argv.some(arg => arg.includes("server.ts") || arg.includes("tsx"));
+
+  if (!isProduction) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -398,7 +401,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`GlowTales server running on port ${PORT}`);
+    console.log(`GlowTales server running on port ${PORT} (isProduction: ${isProduction})`);
   });
 }
 
