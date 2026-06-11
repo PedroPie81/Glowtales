@@ -1,43 +1,93 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import dotenv from "dotenv";
-import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 
 dotenv.config();
 
 const app = express();
 app.use(express.json({ limit: "15mb" }));
 
-// Lazy initializer for ElevenLabs Client
-let elevenLabsClient: ElevenLabsClient | null = null;
-function getElevenLabs(): ElevenLabsClient {
-  if (!elevenLabsClient) {
-    const key = process.env.ELEVENLABS_API_KEY || process.env.ELEVEN_LABS_API_KEY;
-    console.log("Initializing ElevenLabs Client:", {
-      hasELEVENLABS: !!process.env.ELEVENLABS_API_KEY,
-      hasELEVEN_LABS: !!process.env.ELEVEN_LABS_API_KEY
-    });
-    if (!key) {
-      throw new Error("ElevenLabs API Key environment variable is required");
-    }
-    elevenLabsClient = new ElevenLabsClient({ apiKey: key });
-  }
-  return elevenLabsClient;
-}
-
 const PORT = 3000;
 
-// Initialize Google Gen AI
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
+// Lazy initializer for Google Gen AI
+let aiInstance: GoogleGenAI | null = null;
+function getGoogleGenAI(): GoogleGenAI {
+  if (!aiInstance) {
+    const key = process.env.GEMINI_API_KEY;
+    console.log("Initializing Google Gen AI:", {
+      hasGeminiKey: !!key,
+      keyPrefix: key ? key.substring(0, 5) : "none"
+    });
+    if (!key || key.trim() === "" || key === "MY_GEMINI_API_KEY") {
+      throw new Error("GEMINI_API_KEY environment variable is required. Please set it in Settings > Secrets of your AI Studio.");
     }
+
+    const isAccessToken = key.startsWith("ya29.");
+    const sdkOptions: any = {
+      apiKey: isAccessToken ? "" : key,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    };
+
+    if (isAccessToken) {
+      console.log("Detected ya29. OAuth access token; setting baseUrl bypass and Authorization Bearer header directly.");
+      sdkOptions.httpOptions.baseUrl = "https://generativelanguage.googleapis.com";
+      sdkOptions.httpOptions.headers['Authorization'] = `Bearer ${key}`;
+    }
+
+    aiInstance = new GoogleGenAI(sdkOptions);
   }
-});
+  return aiInstance;
+}
+
+// Error formatter for Gemini interactions
+function handleGeminiError(error: any, context = "action") {
+  console.error(`Gemini API Error in ${context}:`, error);
+  const errorString = String(error);
+  
+  const isPermissionDenied = error.status === 403 || 
+                             error.statusCode === 403 || 
+                             errorString.includes("insufficient authentication scopes") || 
+                             errorString.includes("ACCESS_TOKEN_SCOPE_INSUFFICIENT") ||
+                             errorString.includes("PERMISSION_DENIED");
+                             
+  const isApiKeyMissingOrInvalid = !process.env.GEMINI_API_KEY || 
+                                   process.env.GEMINI_API_KEY.trim() === "" ||
+                                   process.env.GEMINI_API_KEY === "MY_GEMINI_API_KEY";
+
+  if (isPermissionDenied || isApiKeyMissingOrInvalid) {
+    return {
+      error: "Your Gemini API Key is missing, unauthorized, or contains insufficient scopes.",
+      details: "It looks like your Gemini API Key is not set, or your service is unable to authorize the request using default scopes. Please make sure you have added your valid GEMINI_API_KEY in the Settings > Secrets panel of Google AI Studio.",
+      status: 400
+    };
+  }
+
+  const isRateLimit = error.status === 429 || 
+                      error.statusCode === 429 || 
+                      errorString.includes("429") || 
+                      errorString.toLowerCase().includes("rate limit") || 
+                      errorString.toLowerCase().includes("quota");
+
+  if (isRateLimit) {
+    return {
+      error: "We hit a quiet spot (Service limits reached).",
+      details: "The content generation service is currently experiencing high demand. Please try again in a few moments.",
+      status: 429
+    };
+  }
+
+  return {
+    error: `We could not complete your ${context} request at this moment.`,
+    details: error.message || errorString,
+    status: 500
+  };
+}
 
 // Retry decorator to absorb 429 / 503 limits dynamically
 async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1500): Promise<T> {
@@ -142,8 +192,8 @@ Every single image description inside 'suggestedIllustrations' MUST start exactl
 
 Your response must be JSON matching the schema, with the title, the content including the ${numImages} image markers ([IMAGE_1] to [IMAGE_${numImages}]) on separate lines, a description of the consistent physical appearance of ${name} (for characterAppearance), a description of the key focus objects (for objectAppearance), exactly ${numImages} distinct illustration descriptions in suggestedIllustrations matching the [IMAGE_1] to [IMAGE_${numImages}] points, and the keyFeatures tags.`;
 
-    const response = await withRetry(() => ai.models.generateContent({
-      model: "gemini-3.5-flash",
+    const response = await withRetry(() => getGoogleGenAI().models.generateContent({
+      model: "gemini-2.5-flash",
       contents: prompt,
       config: {
         systemInstruction,
@@ -215,10 +265,10 @@ Your response must be JSON matching the schema, with the title, the content incl
     return res.json(storyData);
 
   } catch (error: any) {
-    console.error("Story generation error:", error);
-    res.status(500).json({ 
-      error: "We could not generate the story at this moment.", 
-      details: error.message || String(error)
+    const errorDetails = handleGeminiError(error, "story generation");
+    res.status(errorDetails.status).json({
+      error: errorDetails.error,
+      details: errorDetails.details
     });
   }
 });
@@ -273,7 +323,7 @@ app.post("/api/generate-image", async (req, res) => {
     }
     partsPayload.push({ text: fullImagePrompt });
 
-    const apiResponse = await withRetry(() => ai.models.generateContent({
+    const apiResponse = await withRetry(() => getGoogleGenAI().models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: {
         parts: partsPayload,
@@ -303,86 +353,15 @@ app.post("/api/generate-image", async (req, res) => {
     return res.json({ imageUrl: `data:image/png;base64,${base64ImageBytes}` });
 
   } catch (error: any) {
-    console.error("Image generation error:", error);
-    res.status(500).json({ 
-      error: "We could not generate the illustration at this moment.", 
-      details: error.message || String(error)
+    const errorDetails = handleGeminiError(error, "illustration generation");
+    res.status(errorDetails.status).json({
+      error: errorDetails.error,
+      details: errorDetails.details
     });
   }
 });
 
-// Secure Server-side ElevenLabs Text-to-Speech proxy
-app.post("/api/tts", async (req, res) => {
-  try {
-    const { text, voiceId } = req.body;
-    if (!text) {
-      return res.status(400).json({ error: "Missing required parameter 'text'" });
-    }
 
-    const key = process.env.ELEVENLABS_API_KEY || process.env.ELEVEN_LABS_API_KEY;
-    console.log("TTS Request security checks:", {
-      hasELEVENLABS: !!process.env.ELEVENLABS_API_KEY,
-      hasELEVEN_LABS: !!process.env.ELEVEN_LABS_API_KEY
-    });
-    if (!key || key.trim() === "") {
-      return res.status(400).json({ 
-        error: "ElevenLabs API Key is not configured.",
-        instructions: "Please add your ELEVENLABS_API_KEY to the Settings/Secrets panel in AI Studio to enable peaceful audio narrations." 
-      });
-    }
-
-    const elevenlabs = getElevenLabs();
-
-    // Deep clean text for sensory voice: strip image tags [IMAGE_1] and raw Markdown formatting symbols (* _ # ` >)
-    let cleanText = text
-      .replace(/\[IMAGE_\d+\]/g, "") // Strip [IMAGE_1], etc.
-      .replace(/[*_#`~>]/g, "")      // Strip typical Markdown symbols
-      .replace(/\s+/g, " ")          // Normalize spacing for continuous speech
-      .trim();
-
-    console.log(`Piping ElevenLabs Speech Request: voiceId="${voiceId || "NOpBlnGInO9m6vDvFkFC"}", textLength=${cleanText.length}`);
-
-    const audioStream = await elevenlabs.textToSpeech.convert(voiceId || "NOpBlnGInO9m6vDvFkFC", {
-      text: cleanText,
-      modelId: "eleven_multilingual_v2"
-    });
-
-    res.setHeader("Content-Type", "audio/mpeg");
-
-    // Pipe the response stream safely depending on stream type returned
-    if (audioStream && typeof (audioStream as any).pipe === "function") {
-      (audioStream as any).pipe(res);
-    } else if (audioStream && (audioStream as any).getReader) {
-      const reader = (audioStream as any).getReader();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        res.write(value);
-      }
-      res.end();
-    } else {
-      res.send(audioStream);
-    }
-
-  } catch (error: any) {
-    console.error("ElevenLabs TTS Error:", error);
-    
-    const errorString = String(error);
-    const is401 = error.status === 401 || error.statusCode === 401 || errorString.includes("401");
-    
-    if (is401) {
-      return res.status(401).json({
-        error: "Your ElevenLabs API Key is unauthorized (HTTP 401 Error).",
-        details: "It looks like the API Key entered in Settings/Secrets is invalid or was copied incorrectly. Please make sure you are using your global ElevenLabs API Key, not a Voice ID. (You only need one master API key for all voices!)"
-      });
-    }
-
-    res.status(500).json({ 
-      error: "We could not generate the comforting voice narration at this moment.",
-      details: error.message || errorString
-    });
-  }
-});
 
 // Vite Integration and Host Static files in Production
 async function startServer() {
