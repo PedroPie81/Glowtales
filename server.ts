@@ -102,7 +102,7 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1500): Pr
     }
     const jitter = Math.random() * 400;
     const nextDelay = delay * 2 + jitter;
-    console.warn(`Retryable error on Gemini API. Retrying in ${nextDelay.toFixed(0)}ms. Retries left: ${retries}`);
+    console.log(`[Gemini Auto-Retry] Rescheduling call in ${nextDelay.toFixed(0)}ms (Attempts left: ${retries})`);
     await new Promise(resolve => setTimeout(resolve, nextDelay));
     return withRetry(fn, retries - 1, nextDelay);
   }
@@ -371,6 +371,23 @@ async function startServer() {
       appType: "spa",
     });
     app.use(vite.middlewares);
+
+    // Explicit SPA fallback for development (e.g. refreshes on /create, /examples)
+    app.use('*', async (req, res, next) => {
+      const url = req.originalUrl;
+      if (url.startsWith('/api')) {
+        return next();
+      }
+      try {
+        const fs = await import("fs");
+        const templatePath = path.resolve(process.cwd(), 'index.html');
+        let template = fs.readFileSync(templatePath, 'utf-8');
+        template = await vite.transformIndexHtml(url, template);
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+      } catch (e) {
+        next(e);
+      }
+    });
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
