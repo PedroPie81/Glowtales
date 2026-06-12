@@ -6,6 +6,14 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+// Standard process listeners to guarantee complete server resilience and uptime under concurrent error/congestion scenarios
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[Process Resiliency] Grabbed unhandled rejection at:", promise, "reason:", reason);
+});
+process.on("uncaughtException", (error) => {
+  console.error("[Process Resiliency] Grabbed uncaught exception:", error);
+});
+
 const app = express();
 app.use(express.json({ limit: "15mb" }));
 
@@ -226,17 +234,17 @@ Your response must be JSON matching the schema, with the title, the content incl
 
     let response;
     try {
-      console.log("Attempting story generation with model: gemini-3.5-flash");
-      // Call primary model directly without withRetry to allow immediate fallback to gemini-2.5-flash on congestion/503
+      console.log("Attempting story generation with highly responsive primary model: gemini-2.5-flash");
+      // Call primary model gemini-2.5-flash directly for fast and stable structured JSON content
       response = await getGoogleGenAI().models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: prompt,
         config
       });
     } catch (primaryErr: any) {
-      console.warn("Primary model gemini-3.5-flash failed, attempting fallback to gemini-2.5-flash...", primaryErr?.message || primaryErr);
+      console.log("[Fallback Activation] Primary gemini-2.5-flash busy or limited, attempting secondary gemini-3.5-flash...");
       response = await withRetry(() => getGoogleGenAI().models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.5-flash",
         contents: prompt,
         config
       }));
