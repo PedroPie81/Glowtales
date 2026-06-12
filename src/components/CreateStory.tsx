@@ -69,6 +69,31 @@ export default function CreateStory() {
     setFormData(prev => ({ ...prev, specialInterests: interest, triggers }));
   };
 
+  // Robust fetch retry helper to handle server reboots, cold starts, and intermittent network issues
+  const fetchWithRetry = async (url: string, options: RequestInit, retries = 4, delay = 1500): Promise<Response> => {
+    try {
+      const response = await fetch(url, options);
+      const contentType = response.headers.get("content-type") || "";
+      
+      // If we got HTML (e.g. 502/503/504 Bad Gateway / Vite restarting), retry!
+      const isHtml = contentType.includes("text/html") || response.status === 502 || response.status === 503 || response.status === 504;
+      
+      if (isHtml && retries > 0) {
+        console.warn(`[Client-Side Retry] Server restarting or HTML received (status: ${response.status}). Retrying in ${delay}ms... (${retries} attempts left)`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return fetchWithRetry(url, options, retries - 1, delay * 1.5);
+      }
+      return response;
+    } catch (err) {
+      if (retries > 0) {
+        console.warn(`[Client-Side Retry] Connection error. Retrying in ${delay}ms... (${retries} attempts left)`, err);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return fetchWithRetry(url, options, retries - 1, delay * 1.5);
+      }
+      throw err;
+    }
+  };
+
   // 3. API Handlers
   const handleGenerateStory = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,7 +115,7 @@ export default function CreateStory() {
 
 
     try {
-      const response = await fetch("/api/generate-story", {
+      const response = await fetchWithRetry("/api/generate-story", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData)
@@ -151,7 +176,7 @@ export default function CreateStory() {
       setImageErrors(prev => ({ ...prev, [markerIdx]: "" }));
 
       try {
-        const imageRes = await fetch("/api/generate-image", {
+        const imageRes = await fetchWithRetry("/api/generate-image", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -218,7 +243,7 @@ export default function CreateStory() {
     setImageErrors(prev => ({ ...prev, [markerIdx]: "" }));
 
     try {
-      const imageRes = await fetch("/api/generate-image", {
+      const imageRes = await fetchWithRetry("/api/generate-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

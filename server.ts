@@ -104,8 +104,17 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 1, delay = 1000): Pr
   } catch (error: any) {
     const errorString = String(error || "");
     const status = error?.status || error?.statusCode || (error?.response && error?.response?.status);
-    const isRetryable = status === 429 || status === 503 || errorString.includes("429") || errorString.includes("503") || errorString.toLowerCase().includes("rate");
+    
+    // If daily free-tier quota is fully exhausted, retrying is futile and slow. Skip retry to fallback instantly.
+    const isDailyQuotaExceeded = errorString.toLowerCase().includes("exceeded") && 
+                                 (errorString.toLowerCase().includes("quota") || errorString.toLowerCase().includes("limit"));
+    
+    const isRetryable = (status === 429 || status === 503 || errorString.includes("429") || errorString.includes("503") || errorString.toLowerCase().includes("rate")) && !isDailyQuotaExceeded;
+    
     if (!isRetryable || retries <= 0) {
+      if (isDailyQuotaExceeded) {
+        console.log("[Gemini Retry Bypassed] Daily quota limits reached, bypassing retry to trigger instant fallback cascade.");
+      }
       throw error;
     }
     const jitter = Math.random() * 400;
@@ -252,17 +261,27 @@ Your response must be JSON matching the schema, with the title, the content incl
           config
         }));
       } catch (err2: any) {
-        console.warn("[Quota Fallback] Secondary gemini-3.1-flash-lite failed or reached quota limit. Falling back to gemini-flash-latest...", err2?.message || err2);
+        console.warn("[Quota Fallback] Secondary gemini-3.1-flash-lite failed or reached quota limit. Falling back to gemini-2.5-flash...", err2?.message || err2);
         try {
-          selectedModel = "gemini-flash-latest";
+          selectedModel = "gemini-2.5-flash";
           response = await withRetry(() => getGoogleGenAI().models.generateContent({
-            model: "gemini-flash-latest",
+            model: "gemini-2.5-flash",
             contents: prompt,
             config
           }));
         } catch (err3: any) {
-          console.error("All story generation models (gemini-3.5-flash, gemini-3.1-flash-lite, gemini-flash-latest) failed:", err3);
-          throw err3;
+          console.warn("[Quota Fallback] Tertiary gemini-2.5-flash failed or reached quota limit. Falling back to gemini-flash-latest...", err3?.message || err3);
+          try {
+            selectedModel = "gemini-flash-latest";
+            response = await withRetry(() => getGoogleGenAI().models.generateContent({
+              model: "gemini-flash-latest",
+              contents: prompt,
+              config
+            }));
+          } catch (err4: any) {
+            console.error("All narrative models (gemini-3.5-flash, gemini-3.1-flash-lite, gemini-2.5-flash, gemini-flash-latest) failed.", err4);
+            throw err4;
+          }
         }
       }
     }
