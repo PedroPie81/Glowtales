@@ -86,7 +86,7 @@ function handleGeminiError(error: any, context = "action") {
     return {
       error: "We hit a quiet spot (Service limits reached).",
       details: "The content generation service is currently experiencing high demand. Please try again in a few moments.",
-      status: 429
+      status: 400
     };
   }
 
@@ -140,7 +140,7 @@ app.post("/api/generate-story", async (req, res) => {
       return res.status(400).json({ error: "Missing required fields (Child's Name and Special Interests)" });
     }
 
-    const narrativeWordCount = length === "Short" ? "around 300 words" : length === "Long" ? "around 800-1000 words" : "around 500-600 words";
+    const narrativeWordCount = length === "Short" ? "around 250 words" : length === "Long" ? "around 600-750 words" : "around 400-500 words";
     
     // Dynamic number of illustrations: Create 4-6 image prompts/markers for a short story. Short story -> 5 images. Else 4 images.
     const numImages = length === "Short" ? 5 : 4;
@@ -233,22 +233,41 @@ Your response must be JSON matching the schema, with the title, the content incl
     };
 
     let response;
+    let selectedModel = "gemini-3.5-flash";
     try {
-      console.log("Attempting story generation with highly responsive primary model: gemini-2.5-flash");
-      // Call primary model gemini-2.5-flash directly for fast and stable structured JSON content
-      response = await getGoogleGenAI().models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-        config
-      });
-    } catch (primaryErr: any) {
-      console.log("[Fallback Activation] Primary gemini-2.5-flash busy or limited, attempting secondary gemini-3.5-flash...");
+      console.log("Attempting story generation with highly responsive primary model: gemini-3.5-flash");
+      // Call primary model gemini-3.5-flash with retry for fast, stable structured JSON content
       response = await withRetry(() => getGoogleGenAI().models.generateContent({
         model: "gemini-3.5-flash",
         contents: prompt,
         config
       }));
+    } catch (err: any) {
+      console.warn("[Quota Fallback] Primary gemini-3.5-flash failed or reached quota limit. Falling back to gemini-3.1-flash-lite...", err?.message || err);
+      try {
+        selectedModel = "gemini-3.1-flash-lite";
+        response = await withRetry(() => getGoogleGenAI().models.generateContent({
+          model: "gemini-3.1-flash-lite",
+          contents: prompt,
+          config
+        }));
+      } catch (err2: any) {
+        console.warn("[Quota Fallback] Secondary gemini-3.1-flash-lite failed or reached quota limit. Falling back to gemini-flash-latest...", err2?.message || err2);
+        try {
+          selectedModel = "gemini-flash-latest";
+          response = await withRetry(() => getGoogleGenAI().models.generateContent({
+            model: "gemini-flash-latest",
+            contents: prompt,
+            config
+          }));
+        } catch (err3: any) {
+          console.error("All story generation models (gemini-3.5-flash, gemini-3.1-flash-lite, gemini-flash-latest) failed:", err3);
+          throw err3;
+        }
+      }
     }
+
+    console.log(`Story successfully generated using model: ${selectedModel}`);
 
     if (!response.text) {
       throw new Error("No response text returned from Gemini API.");
@@ -345,17 +364,42 @@ app.post("/api/generate-image", async (req, res) => {
     }
     partsPayload.push({ text: fullImagePrompt });
 
-    const apiResponse = await withRetry(() => getGoogleGenAI().models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: {
-        parts: partsPayload,
-      },
-      config: {
-        imageConfig: {
-          aspectRatio: "16:9",
+    let apiResponse;
+    let selectedImageModel = "gemini-2.5-flash-image";
+    try {
+      apiResponse = await withRetry(() => getGoogleGenAI().models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents: {
+          parts: partsPayload,
         },
-      },
-    }));
+        config: {
+          imageConfig: {
+            aspectRatio: "16:9",
+          },
+        },
+      }));
+    } catch (imageErr: any) {
+      console.warn("[Image Quota Fallback] gemini-2.5-flash-image failed or limited, trying gemini-3.1-flash-image...", imageErr?.message || imageErr);
+      try {
+        selectedImageModel = "gemini-3.1-flash-image";
+        apiResponse = await withRetry(() => getGoogleGenAI().models.generateContent({
+          model: 'gemini-3.1-flash-image',
+          contents: {
+            parts: partsPayload,
+          },
+          config: {
+            imageConfig: {
+              aspectRatio: "16:9",
+            },
+          },
+        }));
+      } catch (imageErr2: any) {
+        console.error("All image generation models failed after retry and cascade:", imageErr2);
+        throw imageErr2;
+      }
+    }
+
+    console.log(`Illustration successfully generated using model: ${selectedImageModel}`);
 
     let base64ImageBytes = "";
     const candidates = apiResponse.candidates;
