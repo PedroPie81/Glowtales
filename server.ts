@@ -97,8 +97,8 @@ function handleGeminiError(error: any, context = "action") {
   };
 }
 
-// Retry decorator to absorb 429 / 503 limits dynamically
-async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1500): Promise<T> {
+// Retry decorator to absorb 429 / 503 limits dynamically. Keep retries low (max 1) and delay fast to prevent gateway/proxy timeouts (30s limits) on serverless platforms.
+async function withRetry<T>(fn: () => Promise<T>, retries = 1, delay = 1000): Promise<T> {
   try {
     return await fn();
   } catch (error: any) {
