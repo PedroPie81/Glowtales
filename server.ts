@@ -192,41 +192,55 @@ Every single image description inside 'suggestedIllustrations' MUST start exactl
 
 Your response must be JSON matching the schema, with the title, the content including the ${numImages} image markers ([IMAGE_1] to [IMAGE_${numImages}]) on separate lines, a description of the consistent physical appearance of ${name} (for characterAppearance), a description of the key focus objects (for objectAppearance), exactly ${numImages} distinct illustration descriptions in suggestedIllustrations matching the [IMAGE_1] to [IMAGE_${numImages}] points, and the keyFeatures tags.`;
 
-    const response = await withRetry(() => getGoogleGenAI().models.generateContent({
-      model: "gemini-3.5-flash",
-      contents: prompt,
-      config: {
-        systemInstruction,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            title: { type: Type.STRING },
-            content: { 
-              type: Type.STRING, 
-              description: `The complete markdown formatted text of the story. You MUST insert exactly ${numImages} tags: ${imageTagsString} on their own lines between paragraphs spread evenly.` 
-            },
-            characterAppearance: { type: Type.STRING, description: "Consistent character appearance description (e.g. 'A small 7-year-old boy named Leo, wearing bright red overalls and a soft yellow cap, with copper hair and wide blue eyes')." },
-            objectAppearance: { type: Type.STRING, description: "Consistent main object appearance (e.g. 'A shiny sky-blue steam engine with pristine brass steam valves and exactly six bright red wheels')." },
-            suggestedIllustrations: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING },
-              description: `Must contain exactly ${numImages} descriptions for images corresponding to each image spot [IMAGE_1] to [IMAGE_${numImages}] in order. Do not skip any spots.`
-            },
-            keyFeatures: {
-              type: Type.OBJECT,
-              properties: {
-                specialInterestUsed: { type: Type.STRING },
-                strengthsCelebrated: { type: Type.STRING },
-                sensoryLevel: { type: Type.STRING }
-              },
-              required: ["specialInterestUsed", "strengthsCelebrated", "sensoryLevel"]
-            }
+    const config = {
+      systemInstruction,
+      responseMimeType: "application/json" as const,
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING },
+          content: { 
+            type: Type.STRING, 
+            description: `The complete markdown formatted text of the story. You MUST insert exactly ${numImages} tags: ${imageTagsString} on their own lines between paragraphs spread evenly.` 
           },
-          required: ["title", "content", "characterAppearance", "objectAppearance", "suggestedIllustrations", "keyFeatures"]
-        }
+          characterAppearance: { type: Type.STRING, description: "Consistent character appearance description (e.g. 'A small 7-year-old boy named Leo, wearing bright red overalls and a soft yellow cap, with copper hair and wide blue eyes')." },
+          objectAppearance: { type: Type.STRING, description: "Consistent main object appearance (e.g. 'A shiny sky-blue steam engine with pristine brass steam valves and exactly six bright red wheels')." },
+          suggestedIllustrations: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description: `Must contain exactly ${numImages} descriptions for images corresponding to each image spot [IMAGE_1] to [IMAGE_${numImages}] in order. Do not skip any spots.`
+          },
+          keyFeatures: {
+            type: Type.OBJECT,
+            properties: {
+              specialInterestUsed: { type: Type.STRING },
+              strengthsCelebrated: { type: Type.STRING },
+              sensoryLevel: { type: Type.STRING }
+            },
+            required: ["specialInterestUsed", "strengthsCelebrated", "sensoryLevel"]
+          }
+        },
+        required: ["title", "content", "characterAppearance", "objectAppearance", "suggestedIllustrations", "keyFeatures"]
       }
-    }));
+    };
+
+    let response;
+    try {
+      console.log("Attempting story generation with model: gemini-3.5-flash");
+      // Call primary model directly without withRetry to allow immediate fallback to gemini-2.5-flash on congestion/503
+      response = await getGoogleGenAI().models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: prompt,
+        config
+      });
+    } catch (primaryErr: any) {
+      console.warn("Primary model gemini-3.5-flash failed, attempting fallback to gemini-2.5-flash...", primaryErr?.message || primaryErr);
+      response = await withRetry(() => getGoogleGenAI().models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config
+      }));
+    }
 
     if (!response.text) {
       throw new Error("No response text returned from Gemini API.");
