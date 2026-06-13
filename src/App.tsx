@@ -228,9 +228,10 @@ export default function App() {
       {/* 3. Humble, clean footer */}
       <footer className="bg-white border-t border-slate-100 py-6 text-center text-xs text-slate-400" id="main-footer">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <Star className="h-3.5 w-3.5 text-sky-400 fill-sky-400" />
             <span className="font-semibold text-slate-600">GlowTales</span>
+            <span className="bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded text-[10px] font-bold">v1.1.0</span>
             <span>&copy; 2026 Peter's Family Project.</span>
           </div>
           <div className="flex gap-4">
