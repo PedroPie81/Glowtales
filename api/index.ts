@@ -1,4 +1,4 @@
-import app from "../server";
+import app from "../api-server";
 
 export const config = {
   maxDuration: 60,
