@@ -1,5 +1,5 @@
 import express from "express";
-import app from "./api-server";
+import app from "./api/index";
 import path from "path";
 
 const PORT = 3000;
