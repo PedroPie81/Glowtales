@@ -449,8 +449,13 @@ app.post("/api/generate-image", async (req, res) => {
 
 // Vite Integration and Host Static files in Production
 async function startServer() {
-  const isProduction = process.env.NODE_ENV === "production" ||
-                       !process.argv.some(arg => arg.includes("server.ts") || arg.includes("tsx"));
+  // Determine if we are running the compiled production bundle.
+  // We are in development if 'server.ts' or 'tsx' is active in the execution arguments,
+  // even if the host container pre-sets NODE_ENV=production.
+  const isProduction = !(
+    process.argv.some(arg => arg.includes("server.ts") || arg.includes("tsx")) ||
+    (process.argv[1] && process.argv[1].includes("server.ts"))
+  );
 
   if (!isProduction) {
     // Dynamically import Vite only during development to prevent CJS require of ES module crashing the production server.
