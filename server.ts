@@ -1,6 +1,5 @@
 import express from "express";
 import path from "path";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import dotenv from "dotenv";
 
@@ -454,6 +453,8 @@ async function startServer() {
                        !process.argv.some(arg => arg.includes("server.ts") || arg.includes("tsx"));
 
   if (!isProduction) {
+    // Dynamically import Vite only during development to prevent CJS require of ES module crashing the production server.
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
