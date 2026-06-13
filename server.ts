@@ -13,7 +13,7 @@ process.on("uncaughtException", (error) => {
   console.error("[Process Resiliency] Grabbed uncaught exception:", error);
 });
 
-const app = express();
+export const app = express();
 app.use(express.json({ limit: "15mb" }));
 
 const PORT = 3000;
@@ -501,4 +501,8 @@ async function startServer() {
   });
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;
