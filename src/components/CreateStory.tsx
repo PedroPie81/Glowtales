@@ -69,10 +69,11 @@ export default function CreateStory() {
     setFormData(prev => ({ ...prev, specialInterests: interest, triggers }));
   };
 
-  // Dynamic API Base URL logic: determines if we are running locally within AI Studio, or shared on Cloud Run (using relative paths),
-  // OR if we are deployed as a standalone client on Netlify/static-Vercel (falling back to our pre-compiled Cloud Run container).
+  // Dynamic API Base URL logic: determines if we are running locally within AI Studio, or shared on Cloud Run.
+  // We keep it relative for local containers, Vercel subdomains, and the typical Dev/Pre containers.
   const getApiUrl = (path: string): string => {
     const hostname = window.location.hostname;
+    // If we are on local dev, a .run.app container, or a .vercel.app deployment, relative routing is used.
     const isLocalOrCloudRunContainer = 
       hostname.includes("run.app") || 
       hostname.includes("vercel.app") || 
@@ -83,29 +84,72 @@ export default function CreateStory() {
     if (isLocalOrCloudRunContainer) {
       return path;
     }
-    // Netlify/Custom static pages fallback directly to our stable Cloud Run container backend
-    const stableContainerBackendUrl = "https://ais-pre-n63434nzcpnc5bhqrly7ct-92816011625.europe-west2.run.app";
-    return `${stableContainerBackendUrl}${path}`;
+    // For other custom domains, we first try relative routes in fetchWithRetry.
+    // If the server doesn't respond or returns static SPA fallback HTML (meaning they only deployed static files),
+    // we seamlessly redirect backend calls to our AI Studio container backend.
+    return path;
   };
 
-  // Robust fetch retry helper to handle server reboots, cold starts, and intermittent network issues
+  // Robust fetch retry helper that intelligently handles local backends, static hosting fallbacks,
+  // server reboots, cold starts, and intermittent network limits.
   const fetchWithRetry = async (url: string, options: RequestInit, retries = 4, delay = 1500): Promise<Response> => {
+    const targetUrl = url.startsWith("/api") ? getApiUrl(url) : url;
+    
     try {
-      // Automatically wrap relative /api pathways to target the correct absolute host if needed
-      const targetUrl = url.startsWith("/api") ? getApiUrl(url) : url;
       const response = await fetch(targetUrl, options);
       const contentType = response.headers.get("content-type") || "";
-      
-      // If we got HTML (e.g. 502/503/504 Bad Gateway / Vite restarting), retry!
       const isHtml = contentType.includes("text/html") || response.status === 502 || response.status === 503 || response.status === 504;
-      
+
+      // Detect if we got HTML on an API route from a custom domain (indicating a static fallback page / 404 on host like Netlify/Github Pages)
+      const hostname = window.location.hostname;
+      const isStaticOnlyFallback = isHtml && url.startsWith("/api") && 
+        !hostname.includes("localhost") && 
+        !hostname.includes("127.0.0.1") && 
+        !hostname.includes("run.app") && 
+        !hostname.includes("vercel.app");
+
+      if (isStaticOnlyFallback) {
+        // Redirect the request to our pre-compiled AI Studio container backend
+        const stableContainerBackendUrl = "https://ais-pre-n63434nzcpnc5bhqrly7ct-92816011625.europe-west2.run.app";
+        const fallbackUrl = `${stableContainerBackendUrl}${url}`;
+        console.warn(`[API Dynamic Fallback] Static-only host detected (API returned HTML fallback). Delegating request to AI Studio container backend: ${fallbackUrl}`);
+        
+        try {
+          const fallbackRes = await fetch(fallbackUrl, options);
+          return fallbackRes;
+        } catch (fallbackErr) {
+          console.error("[API Dynamic Fallback] Cloud Run fallback backend was unreachable:", fallbackErr);
+          // Fall through to return the original HTML response to be parsed and raise a clear connection reload notice
+        }
+      }
+
       if (isHtml && retries > 0) {
         console.warn(`[Client-Side Retry] Server restarting or HTML received (status: ${response.status}). Retrying in ${delay}ms... (${retries} attempts left)`);
         await new Promise(resolve => setTimeout(resolve, delay));
         return fetchWithRetry(url, options, retries - 1, delay * 1.5);
       }
+
       return response;
     } catch (err) {
+      // If a network connection error was thrown (meaning no backend is listening on this domain at all, common for pure static frontends)
+      const hostname = window.location.hostname;
+      const isCustomStaticHost = url.startsWith("/api") && 
+        !hostname.includes("localhost") && 
+        !hostname.includes("127.0.0.1") && 
+        !hostname.includes("run.app") && 
+        !hostname.includes("vercel.app");
+
+      if (isCustomStaticHost) {
+        const stableContainerBackendUrl = "https://ais-pre-n63434nzcpnc5bhqrly7ct-92816011625.europe-west2.run.app";
+        const fallbackUrl = `${stableContainerBackendUrl}${url}`;
+        try {
+          console.warn(`[API Dynamic Fallback] Connection failed. Delegating request to AI Studio container backend: ${fallbackUrl}`);
+          return await fetch(fallbackUrl, options);
+        } catch (fallbackErr) {
+          console.error("[API Dynamic Fallback] Cloud Run fallback backend was unreachable:", fallbackErr);
+        }
+      }
+
       if (retries > 0) {
         console.warn(`[Client-Side Retry] Connection error. Retrying in ${delay}ms... (${retries} attempts left)`, err);
         await new Promise(resolve => setTimeout(resolve, delay));

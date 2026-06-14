@@ -19,6 +19,21 @@ app.use((req, res, next) => {
   next();
 });
 
+// Path-normalization middleware to ensure total compatibility when deployed under serverless environments (like Vercel)
+// Vercel may rewrite /api/generate-story to execute api/index.ts with req.url mapped to /generate-story or /api/generate-story.
+app.use((req, res, next) => {
+  const originalUrl = req.url;
+  if (req.url.endsWith("/generate-story")) {
+    req.url = "/api/generate-story";
+  } else if (req.url.endsWith("/generate-image")) {
+    req.url = "/api/generate-image";
+  }
+  if (originalUrl !== req.url) {
+    console.log(`[Path Normalization] Normalized request URL from ${originalUrl} to ${req.url}`);
+  }
+  next();
+});
+
 // Lazy initializer for Google Gen AI
 let aiInstance: GoogleGenAI | null = null;
 function getGoogleGenAI(): GoogleGenAI {
