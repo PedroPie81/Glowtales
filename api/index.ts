@@ -168,6 +168,20 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 1, delay = 1000): Pr
   }
 }
 
+
+// Debug Env Endpoint
+app.get("/api/debug-env", (req, res) => {
+  const keys = Object.keys(process.env);
+  const debugInfo: Record<string, string> = {};
+  for (const k of keys) {
+    if (k.includes("API") || k.includes("GEMINI") || k.includes("GOOGLE") || k.includes("PORT") || k.includes("NODE")) {
+      const val = process.env[k];
+      debugInfo[k] = val ? (val.length <= 8 ? `[len: ${val.length}] ${val}` : `[len: ${val.length}] ${val.slice(0, 4)}...${val.slice(-4)}`) : "undefined";
+    }
+  }
+  res.json({ debugInfo });
+});
+
 // Generate Story Endpoint
 app.post("/api/generate-story", async (req, res) => {
   try {
