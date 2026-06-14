@@ -69,10 +69,25 @@ export default function CreateStory() {
     setFormData(prev => ({ ...prev, specialInterests: interest, triggers }));
   };
 
+  // Dynamic API Base URL logic: determines if we are running locally within AI Studio, or shared on Cloud Run (using relative paths),
+  // OR if we are deployed as a standalone client on Netlify/static-Vercel (falling back to our pre-compiled Cloud Run container).
+  const getApiUrl = (path: string): string => {
+    const hostname = window.location.hostname;
+    const isLocalOrCloudRunContainer = hostname.includes("run.app") || hostname.includes("localhost") || hostname.includes("127.0.0.1") || hostname.startsWith("192.") || hostname.startsWith("10.");
+    if (isLocalOrCloudRunContainer) {
+      return path;
+    }
+    // Netlify/Custom static pages fallback directly to our stable Cloud Run container backend
+    const stableContainerBackendUrl = "https://ais-pre-n63434nzcpnc5bhqrly7ct-92816011625.europe-west2.run.app";
+    return `${stableContainerBackendUrl}${path}`;
+  };
+
   // Robust fetch retry helper to handle server reboots, cold starts, and intermittent network issues
   const fetchWithRetry = async (url: string, options: RequestInit, retries = 4, delay = 1500): Promise<Response> => {
     try {
-      const response = await fetch(url, options);
+      // Automatically wrap relative /api pathways to target the correct absolute host if needed
+      const targetUrl = url.startsWith("/api") ? getApiUrl(url) : url;
+      const response = await fetch(targetUrl, options);
       const contentType = response.headers.get("content-type") || "";
       
       // If we got HTML (e.g. 502/503/504 Bad Gateway / Vite restarting), retry!

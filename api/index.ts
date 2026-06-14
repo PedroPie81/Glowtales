@@ -4,16 +4,20 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// Standard process listeners to guarantee complete server resilience and uptime under concurrent error/congestion scenarios
-process.on("unhandledRejection", (reason, promise) => {
-  console.error("[Process Resiliency] Grabbed unhandled rejection at:", promise, "reason:", reason);
-});
-process.on("uncaughtException", (error) => {
-  console.error("[Process Resiliency] Grabbed uncaught exception:", error);
-});
-
 export const app = express();
 app.use(express.json({ limit: "15mb" }));
+
+// Custom high-compatibility CORS & Preflight middleware to allow cross-origin requests from Netlify / Vercel static frontends
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, PATCH, DELETE");
+  res.setHeader("Access-Control-Allow-Headers", "X-Requested-With,Content-Type,Authorization");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
 
 // Lazy initializer for Google Gen AI
 let aiInstance: GoogleGenAI | null = null;
