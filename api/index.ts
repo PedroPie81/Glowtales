@@ -1,3 +1,5 @@
+// GlowTales Secure API Backend Layer
+// Version: 1.1.1 (Updated to ensure full local and container cross-environments synchronization)
 import express from "express";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";

@@ -231,7 +231,7 @@ export default function App() {
           <div className="flex items-center gap-1.5">
             <Star className="h-3.5 w-3.5 text-sky-400 fill-sky-400" />
             <span className="font-semibold text-slate-600">GlowTales</span>
-            <span className="bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded text-[10px] font-bold">v1.1.0</span>
+            <span className="bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded text-[10px] font-bold">v1.1.1</span>
             <span>&copy; 2026 Peter's Family Project.</span>
           </div>
           <div className="flex gap-4">
