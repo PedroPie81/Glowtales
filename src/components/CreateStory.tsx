@@ -124,6 +124,38 @@ export default function CreateStory() {
         }
       }
 
+      // Detect if we are on a deployed custom/Vercel host and got a JSON API Key missing, unauthorized, or scopes error
+      const expectsDynamicFallback = url.startsWith("/api") && 
+        !hostname.includes("localhost") && 
+        !hostname.includes("127.0.0.1") && 
+        !hostname.includes("run.app");
+
+      if (expectsDynamicFallback && !isHtml && !response.ok) {
+        try {
+          const clonedRes = response.clone();
+          const json = await clonedRes.json();
+          const looksLikeApiKeyIssue = json?.error && (
+            json.error.toLowerCase().includes("api key") || 
+            json.error.toLowerCase().includes("missing") || 
+            json.error.toLowerCase().includes("unauthorized") || 
+            json.error.toLowerCase().includes("scope")
+          );
+          if (looksLikeApiKeyIssue) {
+            const stableContainerBackendUrl = "https://ais-pre-n63434nzcpnc5bhqrly7ct-92816011625.europe-west2.run.app";
+            const fallbackUrl = `${stableContainerBackendUrl}${url}`;
+            console.warn(`[API Key Fallback] Deployed backend returned API key/scope error. Falling back directly to secure Cloud Run backend: ${fallbackUrl}`);
+            try {
+              const fallbackRes = await fetch(fallbackUrl, options);
+              return fallbackRes;
+            } catch (fallbackErr) {
+              console.error("[API Key Fallback] Cloud Run fallback backend was unreachable:", fallbackErr);
+            }
+          }
+        } catch (cloneErr) {
+          // Ignore parsing issues and progress
+        }
+      }
+
       if (isHtml && retries > 0) {
         console.warn(`[Client-Side Retry] Server restarting or HTML received (status: ${response.status}). Retrying in ${delay}ms... (${retries} attempts left)`);
         await new Promise(resolve => setTimeout(resolve, delay));

@@ -73,12 +73,11 @@ function isAuthOrPermissionError(error: any): boolean {
   const errStr = String(error || "").toLowerCase();
   const status = error?.status || error?.statusCode || (error?.response && error?.response?.status);
   return (
-    status === 400 || 
     status === 401 || 
     status === 403 || 
-    errStr.includes("key") || 
     errStr.includes("api key") || 
-    errStr.includes("permission") || 
+    errStr.includes("apikey") || 
+    errStr.includes("key is missing") ||
     errStr.includes("unauthorized") || 
     errStr.includes("scopes") || 
     errStr.includes("access_token_scope_insufficient") ||
