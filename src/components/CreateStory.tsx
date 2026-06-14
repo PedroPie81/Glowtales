@@ -69,8 +69,9 @@ export default function CreateStory() {
     setFormData(prev => ({ ...prev, specialInterests: interest, triggers }));
   };
 
-  // Dynamic API Base URL logic: determines if we are running locally within AI Studio, or shared on Cloud Run.
-  // We keep it relative for local containers, Vercel subdomains, and the typical Dev/Pre containers.
+  // Dynamic API Base URL logic for cloud-resilient orchestration: 
+  // Determines if we are running locally within AI Studio, or shared on a Cloud Run container.
+  // We prioritize high-compatibility relative routing for local containers, Vercel subdomains, and official containers.
   const getApiUrl = (path: string): string => {
     const hostname = window.location.hostname;
     // If we are on local dev, a .run.app container, or a .vercel.app deployment, relative routing is used.
