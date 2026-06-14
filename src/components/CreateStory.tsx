@@ -73,7 +73,13 @@ export default function CreateStory() {
   // OR if we are deployed as a standalone client on Netlify/static-Vercel (falling back to our pre-compiled Cloud Run container).
   const getApiUrl = (path: string): string => {
     const hostname = window.location.hostname;
-    const isLocalOrCloudRunContainer = hostname.includes("run.app") || hostname.includes("localhost") || hostname.includes("127.0.0.1") || hostname.startsWith("192.") || hostname.startsWith("10.");
+    const isLocalOrCloudRunContainer = 
+      hostname.includes("run.app") || 
+      hostname.includes("vercel.app") || 
+      hostname.includes("localhost") || 
+      hostname.includes("127.0.0.1") || 
+      hostname.startsWith("192.") || 
+      hostname.startsWith("10.");
     if (isLocalOrCloudRunContainer) {
       return path;
     }
@@ -841,10 +847,11 @@ export default function CreateStory() {
             <div className="pt-2">
               <button
                 onClick={handleGenerateStory}
-                className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-orange-700"
+                disabled={isGeneratingStory}
+                className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-orange-700 disabled:opacity-50"
               >
-                <RefreshCw className="h-3 w-3 animate-spin" />
-                Retry Narrative creation
+                <RefreshCw className={`h-3 w-3 ${isGeneratingStory ? 'animate-spin' : ''}`} />
+                {isGeneratingStory ? "Constructing narrative..." : "Retry Narrative creation"}
               </button>
             </div>
           </motion.div>
