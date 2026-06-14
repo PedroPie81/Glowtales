@@ -34,22 +34,24 @@ app.use((req, res, next) => {
   next();
 });
 
-// Lazy initializer for Google Gen AI
+// Lazy initializer for Google Gen AI with dynamic hot-swapping support for updated keys
+let cachedApiKey: string | null = null;
 let aiInstance: GoogleGenAI | null = null;
 function getGoogleGenAI(): GoogleGenAI {
-  if (!aiInstance) {
-    const key = process.env.GEMINI_API_KEY;
-    console.log("Initializing Google Gen AI:", {
-      hasGeminiKey: !!key,
-      keyPrefix: key ? key.substring(0, 5) : "none"
+  const currentKey = (process.env.GEMINI_API_KEY || "").trim();
+  if (!aiInstance || cachedApiKey !== currentKey) {
+    console.log("Configuring or Refreshing Google Gen AI Client instance:", {
+      hasKey: !!currentKey,
+      keyLength: currentKey.length,
+      prefix: currentKey ? currentKey.substring(0, 5) : "none"
     });
-    if (!key || key.trim() === "" || key === "MY_GEMINI_API_KEY") {
-      throw new Error("GEMINI_API_KEY environment variable is required. Please set it in Settings > Secrets of your AI Studio.");
+    if (!currentKey || currentKey === "MY_GEMINI_API_KEY") {
+      throw new Error("GEMINI_API_KEY is unset or set to placeholder. Please configure your key in Settings > Secrets within Google AI Studio.");
     }
 
-    const isAccessToken = key.startsWith("ya29.");
+    const isAccessToken = currentKey.startsWith("ya29.");
     const sdkOptions: any = {
-      apiKey: isAccessToken ? "" : key,
+      apiKey: isAccessToken ? "" : currentKey,
       httpOptions: {
         headers: {
           'User-Agent': 'aistudio-build',
@@ -58,12 +60,13 @@ function getGoogleGenAI(): GoogleGenAI {
     };
 
     if (isAccessToken) {
-      console.log("Detected ya29. OAuth access token; setting baseUrl bypass and Authorization Bearer header directly.");
+      console.log("Configuring with live OAuth access token (ya29.) bypass");
       sdkOptions.httpOptions.baseUrl = "https://generativelanguage.googleapis.com";
-      sdkOptions.httpOptions.headers['Authorization'] = `Bearer ${key}`;
+      sdkOptions.httpOptions.headers['Authorization'] = `Bearer ${currentKey}`;
     }
 
     aiInstance = new GoogleGenAI(sdkOptions);
+    cachedApiKey = currentKey;
   }
   return aiInstance;
 }
@@ -101,9 +104,10 @@ function handleGeminiError(error: any, context = "action") {
                                    process.env.GEMINI_API_KEY === "MY_GEMINI_API_KEY";
 
   if (isPermissionDenied || isApiKeyMissingOrInvalid || isAuthOrPermissionError(error)) {
+    const rawMsg = error?.message || errorString || "No specific error text returned.";
     return {
       error: "Your Gemini API Key is missing, unauthorized, or contains insufficient scopes.",
-      details: "It looks like your Gemini API Key is not set, or your service is unable to authorize the request. Please make sure you have added your valid GEMINI_API_KEY in the Settings > Secrets panel of Google AI Studio.",
+      details: `Raw Details: ${rawMsg}. Please check that your valid GEMINI_API_KEY is active and authorized under Settings > Secrets.`,
       status: 400
     };
   }

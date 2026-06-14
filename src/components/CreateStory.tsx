@@ -51,7 +51,7 @@ export default function CreateStory() {
   // 2. Generation & Output State
   const [isGeneratingStory, setIsGeneratingStory] = useState(false);
   const [storyResult, setStoryResult] = useState<StoryResult | null>(null);
-  const [generationError, setGenerationError] = useState<{ message: string; isRateLimit: boolean } | null>(null);
+  const [generationError, setGenerationError] = useState<{ message: string; details?: string; isRateLimit: boolean } | null>(null);
 
   // Individual image generation status
   // record index -> boolean
@@ -234,7 +234,7 @@ export default function CreateStory() {
 
       if (!response.ok) {
         const isRate = response.status === 429 || String(data.details || "").includes("429") || String(data.error || "").toLowerCase().includes("limit");
-        throw { message: data.error || data.details || "Request failed", isRateLimit: isRate };
+        throw { message: data.error || "Request failed", details: data.details || "", isRateLimit: isRate };
       }
 
       const result: StoryResult = {
@@ -253,6 +253,7 @@ export default function CreateStory() {
       console.error(err);
       setGenerationError({
         message: err.message || "We could not construct the narrative right now. Please try again.",
+        details: err.details || "",
         isRateLimit: err.isRateLimit || false
       });
     } finally {
@@ -919,6 +920,12 @@ export default function CreateStory() {
                   ? "We have momentarily hit the default sandbox Gemini API limits. Please wait a minute or connect your own API Key in Settings > Secrets to continue uninterrupted."
                   : generationError.message}
               </p>
+              {generationError.details && (
+                <div className="mt-3 p-3.5 bg-orange-100/40 rounded-xl text-[11px] font-mono text-orange-950 border border-orange-200/50 leading-relaxed text-left break-words">
+                  <div className="font-bold mb-1 uppercase tracking-wider text-[10px] text-orange-800">Diagnostic Details:</div>
+                  {generationError.details}
+                </div>
+              )}
             </div>
 
             <div className="pt-2">
