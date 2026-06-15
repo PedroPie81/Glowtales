@@ -111,6 +111,9 @@ export default function CreateStory() {
       hostname.includes("vercel.app") || 
       hostname.includes("localhost") || 
       hostname.includes("127.0.0.1") || 
+      hostname.includes("googleusercontent.com") || 
+      hostname.includes("google") || 
+      hostname.includes("aistudio") || 
       hostname.startsWith("192.") || 
       hostname.startsWith("10.");
     if (isLocalOrCloudRunContainer) {
@@ -138,7 +141,10 @@ export default function CreateStory() {
         !hostname.includes("localhost") && 
         !hostname.includes("127.0.0.1") && 
         !hostname.includes("run.app") && 
-        !hostname.includes("vercel.app");
+        !hostname.includes("vercel.app") &&
+        !hostname.includes("googleusercontent.com") &&
+        !hostname.includes("google") &&
+        !hostname.includes("aistudio");
 
       if (isStaticOnlyFallback) {
         // Redirect the request to our pre-compiled AI Studio container backend
@@ -159,7 +165,10 @@ export default function CreateStory() {
       const expectsDynamicFallback = url.startsWith("/api") && 
         !hostname.includes("localhost") && 
         !hostname.includes("127.0.0.1") && 
-        !hostname.includes("run.app");
+        !hostname.includes("run.app") &&
+        !hostname.includes("googleusercontent.com") &&
+        !hostname.includes("google") &&
+        !hostname.includes("aistudio");
 
       if (expectsDynamicFallback && !isHtml && !response.ok) {
         try {
@@ -201,7 +210,10 @@ export default function CreateStory() {
         !hostname.includes("localhost") && 
         !hostname.includes("127.0.0.1") && 
         !hostname.includes("run.app") && 
-        !hostname.includes("vercel.app");
+        !hostname.includes("vercel.app") &&
+        !hostname.includes("googleusercontent.com") &&
+        !hostname.includes("google") &&
+        !hostname.includes("aistudio");
 
       if (isCustomStaticHost) {
         const stableContainerBackendUrl = "https://ais-pre-n63434nzcpnc5bhqrly7ct-92816011625.europe-west2.run.app";
