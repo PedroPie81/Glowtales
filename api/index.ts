@@ -15,6 +15,10 @@ app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, PATCH, DELETE");
   res.setHeader("Access-Control-Allow-Headers", "X-Requested-With,Content-Type,Authorization");
   res.setHeader("Access-Control-Allow-Credentials", "true");
+  // Set anti-caching headers to secure fresh state fetching
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
   if (req.method === "OPTIONS") {
     return res.sendStatus(200);
   }

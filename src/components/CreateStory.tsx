@@ -256,7 +256,7 @@ export default function CreateStory() {
 
 
     try {
-      const response = await fetchWithRetry("/api/generate-story", {
+      const response = await fetchWithRetry(`/api/generate-story?cb=${Date.now()}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData)
@@ -318,7 +318,7 @@ export default function CreateStory() {
       setImageErrors(prev => ({ ...prev, [markerIdx]: "" }));
 
       try {
-        const imageRes = await fetchWithRetry("/api/generate-image", {
+        const imageRes = await fetchWithRetry(`/api/generate-image?cb=${Date.now()}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -385,7 +385,7 @@ export default function CreateStory() {
     setImageErrors(prev => ({ ...prev, [markerIdx]: "" }));
 
     try {
-      const imageRes = await fetchWithRetry("/api/generate-image", {
+      const imageRes = await fetchWithRetry(`/api/generate-image?cb=${Date.now()}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1033,6 +1033,21 @@ export default function CreateStory() {
                       You are running in the Google AI Studio cloud workspace environment. To call the Gemini models successfully from your backend, you must declare your active Gemini API key under the AI Studio secrets configuration Panel:
                     </p>
                     <div className="bg-white/80 border border-orange-200/60 rounded-2xl p-4 text-xs text-slate-700 font-sans space-y-2 text-left">
+                      {(window.location.hostname.includes("-pre") || window.location.hostname.includes("pre.run.app")) && (
+                        <div className="mb-4 bg-amber-50/80 border border-amber-200/60 text-amber-950 p-3.5 rounded-xl text-[11px] leading-relaxed space-y-1.5">
+                          <span className="font-semibold text-amber-850 flex items-center gap-1.5 text-xs">
+                            💡 Viewing from Shared App URL
+                          </span>
+                          <p className="text-amber-900/80">
+                            You are currently viewing the app through the <strong>Shared App URL</strong> (-pre.run.app). 
+                            Because the Shared App is a static, separate production deployment snapshot, it does not have access to your private workspace Development Secrets.
+                          </p>
+                          <p className="text-amber-900 font-medium">
+                            👉 Please switch to the <strong>Development App URL</strong> (-dev.run.app) or use the live preview frame on the right side of Google AI Studio to run the app with your active keys!
+                          </p>
+                        </div>
+                      )}
+
                       <div className="font-semibold text-orange-850 flex items-center gap-1.5 mb-1 text-xs">
                         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-orange-100 text-[11.5px] font-bold text-orange-800">1</span>
                         Go to Settings (Gear Icon)
