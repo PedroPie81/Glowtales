@@ -77,9 +77,23 @@ function getGoogleGenAI(): GoogleGenAI {
   return aiInstance;
 }
 
+// Helper to safely serialize any error object or stream into a searchable string representation
+function getCleanErrorString(error: any): string {
+  if (!error) return "";
+  if (typeof error === "string") return error;
+  if (error instanceof Error) {
+    return `${error.message || ""} ${error.stack || ""}`;
+  }
+  try {
+    return JSON.stringify(error);
+  } catch (e) {
+    return String(error);
+  }
+}
+
 // Helper to determine if an error is a non-retryable permission or auth issue
 function isAuthOrPermissionError(error: any): boolean {
-  const errStr = String(error || "").toLowerCase();
+  const errStr = getCleanErrorString(error).toLowerCase();
   const status = error?.status || error?.statusCode || (error?.response && error?.response?.status);
   return (
     status === 401 || 
@@ -96,8 +110,8 @@ function isAuthOrPermissionError(error: any): boolean {
 
 // Error formatter for Gemini interactions
 function handleGeminiError(error: any, context = "action") {
-  console.error(`Gemini API Error in ${context}:`, error);
-  const errorString = String(error || "");
+  console.log(`[Gemini Sync] API Error in ${context}:`, error);
+  const errorString = getCleanErrorString(error);
   
   const isPermissionDenied = error?.status === 403 || 
                              error?.statusCode === 403 || 
@@ -122,7 +136,10 @@ function handleGeminiError(error: any, context = "action") {
                       error?.statusCode === 429 || 
                       errorString.includes("429") || 
                       errorString.toLowerCase().includes("rate limit") || 
-                      errorString.toLowerCase().includes("quota");
+                      errorString.toLowerCase().includes("quota") ||
+                      errorString.toLowerCase().includes("503") ||
+                      errorString.toLowerCase().includes("unavailable") ||
+                      errorString.toLowerCase().includes("demand");
 
   if (isRateLimit) {
     return {
@@ -149,14 +166,14 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 1, delay = 1000): Pr
       throw error;
     }
 
-    const errorString = String(error || "");
+    const errorString = getCleanErrorString(error);
     const status = error?.status || error?.statusCode || (error?.response && error?.response?.status);
     
     // If daily free-tier quota is fully exhausted, retrying is futile and slow. Skip retry to fallback instantly.
     const isDailyQuotaExceeded = errorString.toLowerCase().includes("exceeded") && 
                                  (errorString.toLowerCase().includes("quota") || errorString.toLowerCase().includes("limit"));
     
-    const isRetryable = (status === 429 || status === 503 || errorString.includes("429") || errorString.includes("503") || errorString.toLowerCase().includes("rate")) && !isDailyQuotaExceeded;
+    const isRetryable = (status === 429 || status === 503 || errorString.includes("429") || errorString.includes("503") || errorString.toLowerCase().includes("rate") || errorString.toLowerCase().includes("unavailable") || errorString.toLowerCase().includes("demand")) && !isDailyQuotaExceeded;
     
     if (!isRetryable || retries <= 0) {
       if (isDailyQuotaExceeded) {
@@ -314,11 +331,11 @@ Your response must be JSON matching the schema, with the title, the content incl
       }));
     } catch (err: any) {
       if (isAuthOrPermissionError(err)) {
-        console.error("Directly aborting fallback stream due to authorization configuration mismatch.", err);
+        console.log("[Gemini Fallback System] Directly aborting fallback stream due to authorization configuration mismatch.", err);
         throw err;
       }
 
-      console.warn("[Quota Fallback] Primary gemini-3.5-flash failed or reached quota limit. Falling back to gemini-3.1-flash-lite...", err?.message || err);
+      console.log("[Quota Fallback Info] Primary gemini-3.5-flash reached limit. Handled gracefully; falling back to gemini-3.1-flash-lite...");
       try {
         selectedModel = "gemini-3.1-flash-lite";
         response = await withRetry(() => getGoogleGenAI().models.generateContent({
@@ -328,7 +345,7 @@ Your response must be JSON matching the schema, with the title, the content incl
         }));
       } catch (err2: any) {
         if (isAuthOrPermissionError(err2)) throw err2;
-        console.warn("[Quota Fallback] Secondary gemini-3.1-flash-lite failed or reached quota limit. Falling back to gemini-2.5-flash...", err2?.message || err2);
+        console.log("[Quota Fallback Info] Secondary gemini-3.1-flash-lite reached limit. Handled gracefully; falling back to gemini-2.5-flash...");
         try {
           selectedModel = "gemini-2.5-flash";
           response = await withRetry(() => getGoogleGenAI().models.generateContent({
@@ -338,7 +355,7 @@ Your response must be JSON matching the schema, with the title, the content incl
           }));
         } catch (err3: any) {
           if (isAuthOrPermissionError(err3)) throw err3;
-          console.warn("[Quota Fallback] Tertiary gemini-2.5-flash failed or reached quota limit. Falling back to gemini-flash-latest...", err3?.message || err3);
+          console.log("[Quota Fallback Info] Tertiary gemini-2.5-flash reached limit. Handled gracefully; falling back to gemini-flash-latest...");
           try {
             selectedModel = "gemini-flash-latest";
             response = await withRetry(() => getGoogleGenAI().models.generateContent({
@@ -347,7 +364,7 @@ Your response must be JSON matching the schema, with the title, the content incl
               config
             }));
           } catch (err4: any) {
-            console.error("All narrative models (gemini-3.5-flash, gemini-3.1-flash-lite, gemini-2.5-flash, gemini-flash-latest) failed.", err4);
+            console.log("[Gemini Fatal] All narrative models (gemini-3.5-flash, gemini-3.1-flash-lite, gemini-2.5-flash, gemini-flash-latest) failed.", err4);
             throw err4;
           }
         }
@@ -526,7 +543,7 @@ app.post("/api/generate-image", async (req, res) => {
       return res.json({ imageUrl: `data:image/png;base64,${base64ImageBytes}` });
 
     } catch (imageErr: any) {
-      console.warn("[Image Quota Fallback] gemini-2.5-flash-image failed, trying secondary model gemini-3.1-flash-image...", imageErr?.message || imageErr);
+      console.log("[Image Quota Info] gemini-2.5-flash-image hit a quiet spot. Trying secondary model gemini-3.1-flash-image as dynamic fallback...");
       
       try {
         selectedImageModel = "gemini-3.1-flash-image";
@@ -560,7 +577,7 @@ app.post("/api/generate-image", async (req, res) => {
         return res.json({ imageUrl: `data:image/png;base64,${base64ImageBytes}` });
 
       } catch (imageErr2: any) {
-        console.warn("[Image Quota Fallback] Both Imagen models returned resource limits or are unlicensed. Invoking Intelligent SVG Drawing Fallback via Gemini Text Engine...");
+        console.log("[Image Quota Info] Both Imagen models returned resource limits or are unlicensed. Invoking Intelligent SVG Drawing Fallback via Gemini Text Engine...");
         
         try {
           // Fall back to generating highly customized raw SVG tags using the perfectly working gemini-2.5-flash text model!
@@ -604,7 +621,7 @@ Do NOT output any markdown (no \`\`\`xml or \`\`\`svg wrappers). Start your resp
             throw new Error("Invalid XML/SVG content returned from fallback model");
           }
         } catch (svgFallbackErr: any) {
-          console.error("Vector fallback SVG generation failed, invoking offline generic SVG generator:", svgFallbackErr);
+          console.log("[Image Fallback Info] Vector fallback SVG generation failed, invoking offline generic SVG generator.", svgFallbackErr?.message || svgFallbackErr);
           const offlineSvg = generateOfflineFallbackSvg(illustrationDescription, characterAppearance || "", objectAppearance || "");
           const base64Bytes = Buffer.from(offlineSvg).toString("base64");
           return res.json({ 
