@@ -986,46 +986,95 @@ export default function CreateStory() {
         )}
 
         {/* State B: Error boundary note */}
-        {generationError && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="bg-orange-50 border border-orange-100 rounded-3xl p-6 sm:p-10 space-y-4"
-            id="story-error-screener"
-          >
-            <div className="p-3 bg-white rounded-2xl inline-block shadow-xs">
-              <AlertCircle className="h-8 w-8 text-orange-600" />
-            </div>
-            
-            <div className="space-y-2">
-              <h3 className="text-lg font-medium text-orange-950 font-sans">
-                {generationError.isRateLimit ? "Service limits reached" : "We hit a quiet spot"}
-              </h3>
-              <p className="text-xs text-orange-850 font-sans leading-relaxed">
-                {generationError.isRateLimit 
-                  ? "We have momentarily hit the default sandbox Gemini API limits. Please wait a minute or connect your own API Key in Settings > Secrets to continue uninterrupted."
-                  : generationError.message}
-              </p>
-              {generationError.details && (
-                <div className="mt-3 p-3.5 bg-orange-100/40 rounded-xl text-[11px] font-mono text-orange-950 border border-orange-200/50 leading-relaxed text-left break-words">
-                  <div className="font-bold mb-1 uppercase tracking-wider text-[10px] text-orange-800">Diagnostic Details:</div>
-                  {generationError.details}
-                </div>
-              )}
-            </div>
+        {generationError && (() => {
+          const isKeyError = (generationError.message && (
+            generationError.message.includes("GEMINI_API_KEY") || 
+            generationError.message.includes("API Key") || 
+            generationError.message.includes("API key") || 
+            generationError.message.includes("unset or set to placeholder")
+          )) || (generationError.details && (
+            generationError.details.includes("GEMINI_API_KEY") ||
+            generationError.details.includes("API Key") ||
+            generationError.details.includes("API key") ||
+            generationError.details.includes("unset")
+          ));
 
-            <div className="pt-2">
-              <button
-                onClick={handleGenerateStory}
-                disabled={isGeneratingStory}
-                className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-orange-700 disabled:opacity-50"
-              >
-                <RefreshCw className={`h-3 w-3 ${isGeneratingStory ? 'animate-spin' : ''}`} />
-                {isGeneratingStory ? "Constructing narrative..." : "Retry Narrative creation"}
-              </button>
-            </div>
-          </motion.div>
-        )}
+          return (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="bg-orange-50 border border-orange-100 rounded-3xl p-6 sm:p-10 space-y-4"
+              id="story-error-screener"
+            >
+              <div className="p-3 bg-white rounded-2xl inline-block shadow-xs">
+                <AlertCircle className="h-8 w-8 text-orange-600" />
+              </div>
+              
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-orange-950 font-sans">
+                  {isKeyError ? "Gemini Secrets Activation Required" : (generationError.isRateLimit ? "Service limits reached" : "We hit a quiet spot")}
+                </h3>
+                
+                {isKeyError ? (
+                  <div className="space-y-3">
+                    <p className="text-xs text-orange-900 font-sans leading-relaxed">
+                      You are running in the Google AI Studio cloud workspace environment. To call the Gemini models successfully from your backend, you must declare your active Gemini API key under the AI Studio secrets configuration Panel:
+                    </p>
+                    <div className="bg-white/80 border border-orange-200/60 rounded-2xl p-4 text-xs text-slate-700 font-sans space-y-2 text-left">
+                      <div className="font-semibold text-orange-850 flex items-center gap-1.5 mb-1 text-xs">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-orange-100 text-[11.5px] font-bold text-orange-800">1</span>
+                        Go to Settings (Gear Icon)
+                      </div>
+                      <p className="text-[11px] text-slate-500 pl-6 leading-normal">
+                        Click the **Settings (Gear Icon)** or the panel button located on the top right / sidebar in Google AI Studio.
+                      </p>
+                      
+                      <div className="font-semibold text-orange-850 flex items-center gap-1.5 mb-1 text-xs">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-orange-100 text-[11.5px] font-bold text-orange-800">2</span>
+                        Configure GEMINI_API_KEY Secret
+                      </div>
+                      <p className="text-[11px] text-slate-500 pl-6 leading-normal">
+                        Navigate to **Secrets**, add a new Secret with the exact name <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-[10.5px]">GEMINI_API_KEY</code>, and paste your active Gemini API key or workspace token.
+                      </p>
+
+                      <div className="font-semibold text-orange-850 flex items-center gap-1.5 mb-1 text-xs">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-orange-100 text-[11.5px] font-bold text-orange-800">3</span>
+                        Restart the Dev Server / Re-run
+                      </div>
+                      <p className="text-[11px] text-slate-500 pl-6 leading-normal">
+                        Because environment variables load at process startup, you must re-run the server for changes to apply. You can trigger this easily by typing a simple text instruction like <strong className="text-slate-700">"please restart"</strong> here in the chat, which lets me instantly cycle the active dev server container!
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-orange-850 font-sans leading-relaxed">
+                    {generationError.isRateLimit 
+                      ? "We have momentarily hit the default sandbox Gemini API limits. Please wait a minute or connect your own API Key in Settings > Secrets to continue uninterrupted."
+                      : generationError.message}
+                  </p>
+                )}
+
+                {generationError.details && (
+                  <div className="mt-3 p-3.5 bg-orange-100/40 rounded-xl text-[11px] font-mono text-orange-950 border border-orange-200/50 leading-relaxed text-left break-words">
+                    <div className="font-bold mb-1 uppercase tracking-wider text-[10px] text-orange-800">Diagnostic Details:</div>
+                    {generationError.details}
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-2">
+                <button
+                  onClick={handleGenerateStory}
+                  disabled={isGeneratingStory}
+                  className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-orange-700 disabled:opacity-50"
+                >
+                  <RefreshCw className={`h-3 w-3 ${isGeneratingStory ? 'animate-spin' : ''}`} />
+                  {isGeneratingStory ? "Constructing narrative..." : "Retry Narrative creation"}
+                </button>
+              </div>
+            </motion.div>
+          );
+        })()}
 
         {/* State C: Empty/Idle screen */}
         {!isGeneratingStory && !storyResult && !generationError && (
