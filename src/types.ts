@@ -9,8 +9,6 @@ export interface StoryInput {
   sensoryLevel: string;
   structure: string;
   perspective: "First-person" | "Third-person";
-  includeIllustrations: boolean;
-  visualStyle?: "vector" | "watercolor" | "contrast";
   customAppearance?: string;
   referencePhoto?: string;
   companionName?: string;
@@ -26,13 +24,14 @@ export interface KeyFeatures {
 
 export interface StoryResult {
   title: string;
-  content: string;
+  content: string; // Separated with '---' for gorgeous pages
   characterAppearance: string;
-  objectAppearance: string;
-  suggestedIllustrations: string[];
+  coverIllustrationPrompt: string; 
+  coverImageUrl?: string; // Holds base64 png or svg string
   keyFeatures: KeyFeatures;
-  // Dynamic images map: marker index (e.g., 1, 2, 3, 4) -> full image data URL
-  images?: Record<number, string>;
+  inputs?: StoryInput; // Preserve original input parameters for reload
+  id?: string; // Unique id for list identification
+  createdAt?: string; // Date of formulation
 }
 
 export interface StaticExample {
@@ -42,14 +41,10 @@ export interface StaticExample {
   specialInterest: string;
   superpower: string;
   characterAppearance: string;
-  objectAppearance: string;
   content: string;
-  keyFeatures: {
-    specialInterestUsed: string;
-    strengthsCelebrated: string;
-    sensoryLevel: string;
-  };
-  suggestedIllustrations: string[];
-  // static illustrations - SVGs or CSS layouts as a comforting default
-  fallbackImages: string[]; 
+  keyFeatures: KeyFeatures;
+  coverImageUrl?: string; // Cozy illustration
+  objectAppearance?: string;
+  suggestedIllustrations?: string[];
+  fallbackImages?: string[];
 }

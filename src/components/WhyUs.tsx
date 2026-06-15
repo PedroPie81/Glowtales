@@ -8,14 +8,12 @@ import {
   ShieldCheck, 
   Globe, 
   Check, 
-  HelpCircle,
   Sparkles,
   Heart
 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-// For search engine optimizer transparency and semantic clarity
 interface SEOKeyword {
   phrase: string;
   volume: string;
@@ -26,7 +24,6 @@ interface SEOKeyword {
 export default function WhyUs() {
   const [activeKeywordFilter, setActiveKeywordFilter] = useState<string>("All");
 
-  // Rich SEO Target Phrases requested by user for search visibility
   const seoPhrases: SEOKeyword[] = [
     {
       phrase: "free personalized stories for autistic children",
@@ -104,72 +101,73 @@ export default function WhyUs() {
     : seoPhrases.filter(k => k.intent === activeKeywordFilter);
 
   return (
-    <div className="space-y-16 max-w-5xl mx-auto" id="why-us-seo-page">
+    <div className="space-y-16 max-w-5xl mx-auto py-2 font-sans text-center" id="why-us-seo-page">
       
       {/* Dynamic Header */}
-      <div className="text-center space-y-4">
-        <span className="text-xs font-semibold uppercase tracking-wider text-sky-600 bg-sky-50 px-3 py-1 rounded-full border border-sky-100">
+      <div className="space-y-4 max-w-2xl mx-auto">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#FAF6F0] text-amber-800 border border-amber-200/40">
           The Pure Accessibility Promise
         </span>
-        <h1 className="text-3xl sm:text-4.5xl font-sans font-medium text-slate-800 tracking-tight leading-tight">
+        <h1 className="text-3xl sm:text-4.5xl font-extrabold text-amber-950 font-display tracking-tight leading-tight">
           Why Choose GlowTales?
         </h1>
-        <p className="text-base sm:text-lg text-slate-500 font-sans max-w-2xl mx-auto">
-          Completely free. No memberships. No account creation. Just immediate, peaceful, therapeutic storybooks for your child.
+        <p className="text-sm sm:text-base text-amber-900/60 font-serif leading-relaxed">
+          Completely free. No accounts needed. Just immediate, peaceful, personalized storybooks for your child.
         </p>
       </div>
 
       {/* Direct Value Grid */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-8" id="why-us-core-values">
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left" id="why-us-core-values">
+        
         {/* Value 1: Zero Sign-up */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-100 shadow-3xs hover:shadow-xs transition space-y-4 flex flex-col justify-between">
+        <div className="bg-[#FAF6F0] rounded-3xl p-6 sm:p-8 border border-[#EADBCC] shadow-[#623010]/5 shadow-3xs hover:shadow-2xs transition space-y-4 flex flex-col justify-between">
           <div className="space-y-4">
-            <div className="h-12 w-12 rounded-2xl bg-amber-50 border border-amber-150 flex items-center justify-center text-amber-500">
+            <div className="h-12 w-12 rounded-2xl bg-amber-100 border border-amber-250/30 flex items-center justify-center text-amber-800">
               <UserX className="h-6 w-6" />
             </div>
-            <h3 className="text-lg font-semibold text-slate-800 font-sans">No Registration Needed</h3>
-            <p className="text-xs sm:text-sm text-slate-500 font-sans leading-relaxed">
-              We do not ask for your email, phone number, or child's surname. We believe pediatric tools should be accessed instantly, without forcing families to give up personal data.
+            <h3 className="text-md font-bold text-amber-950 font-display">No Registration Needed</h3>
+            <p className="text-xs text-[#5D4632] font-serif leading-relaxed">
+              We do not ask for your email, phone, or child's surname. We believe pediatric aids should be accessed instantly, without forcing families to give up personal data.
             </p>
           </div>
-          <div className="pt-2">
-            <span className="text-[11px] font-bold text-slate-400 font-mono uppercase tracking-wider">
+          <div>
+            <span className="text-[10px] font-bold text-amber-700/60 font-sans uppercase tracking-wider">
               100% Privacy Secure
             </span>
           </div>
         </div>
 
         {/* Value 2: 100% Free Forever */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-100 shadow-3xs hover:shadow-xs transition space-y-4 flex flex-col justify-between">
+        <div className="bg-[#FAF6F0] rounded-3xl p-6 sm:p-8 border border-[#EADBCC] shadow-[#623010]/5 shadow-3xs hover:shadow-2xs transition space-y-4 flex flex-col justify-between">
           <div className="space-y-4">
-            <div className="h-12 w-12 rounded-2xl bg-emerald-50 border border-emerald-150 flex items-center justify-center text-emerald-500">
+            <div className="h-12 w-12 rounded-2xl bg-amber-100 border border-amber-250/30 flex items-center justify-center text-amber-800">
               <Coins className="h-6 w-6" />
             </div>
-            <h3 className="text-lg font-semibold text-slate-800 font-sans">Absolutely Zero Cost</h3>
-            <p className="text-xs sm:text-sm text-slate-500 font-sans leading-relaxed">
+            <h3 className="text-md font-bold text-amber-950 font-display">Absolutely Zero Cost</h3>
+            <p className="text-xs text-[#5D4632] font-serif leading-relaxed">
               While other sites hide customized story paths behind monthly subscriptions or credits, Peter's family project is free for parents, educators, and developmental therapists everywhere.
             </p>
           </div>
-          <div className="pt-2">
-            <span className="text-[11px] font-bold text-slate-400 font-mono uppercase tracking-wider">
+          <div>
+            <span className="text-[10px] font-bold text-amber-700/60 font-sans uppercase tracking-wider">
               No Paywalls / No Ads
             </span>
           </div>
         </div>
 
         {/* Value 3: Autism Centric design */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-100 shadow-3xs hover:shadow-xs transition space-y-4 flex flex-col justify-between">
+        <div className="bg-[#FAF6F0] rounded-3xl p-6 sm:p-8 border border-[#EADBCC] shadow-[#623010]/5 shadow-3xs hover:shadow-2xs transition space-y-4 flex flex-col justify-between">
           <div className="space-y-4">
-            <div className="h-12 w-12 rounded-2xl bg-sky-50 border border-sky-150 flex items-center justify-center text-sky-500">
+            <div className="h-12 w-12 rounded-2xl bg-amber-100 border border-amber-250/30 flex items-center justify-center text-amber-800">
               <BookOpen className="h-6 w-6" />
             </div>
-            <h3 className="text-lg font-semibold text-slate-800 font-sans">Autism-Friendly Pacing</h3>
-            <p className="text-xs sm:text-sm text-slate-500 font-sans leading-relaxed">
+            <h3 className="text-md font-bold text-amber-950 font-display">Autism-Friendly Pacing</h3>
+            <p className="text-xs text-[#5D4632] font-serif leading-relaxed">
               Traditional AI models write generic stories with alarming twists, loud adjectives, and complicated metaphors. Our layout and structure enforces literal grammar, sensory stability, and highly predictable happy conclusions.
             </p>
           </div>
-          <div className="pt-2">
-            <span className="text-[11px] font-bold text-slate-400 font-mono uppercase tracking-wider">
+          <div>
+            <span className="text-[10px] font-bold text-amber-700/60 font-sans uppercase tracking-wider">
               Pediatrically Grounded
             </span>
           </div>
@@ -177,37 +175,37 @@ export default function WhyUs() {
       </section>
 
       {/* Feature Side-By-Side Comparison */}
-      <section className="bg-white rounded-3xl border border-slate-100 p-6 sm:p-10 shadow-3xs space-y-6" id="comparison-section">
+      <section className="bg-[#FAF6F0] rounded-3xl border border-[#EADBCC] p-6 sm:p-10 shadow-3xs space-y-6 text-left" id="comparison-section">
         <div className="space-y-2">
-          <span className="text-[10px] uppercase font-bold text-sky-600 tracking-wider">Clear Transparent Comparison</span>
-          <h2 className="text-xl sm:text-2xl font-serif font-medium text-slate-800">
+          <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider">Transparent Comparison</span>
+          <h2 className="text-xl sm:text-2xl font-display font-bold text-amber-950">
             How GlowTales Compares to Commercial Platforms
           </h2>
-          <p className="text-xs sm:text-sm text-slate-500 max-w-xl">
-            We put access first. Here is the literal difference between our non-profit approach and typical commercialized reading generators.
+          <p className="text-xs text-[#5D4632] font-serif max-w-xl leading-relaxed">
+            We put access first. Here is the literal difference between our family-first approach and typical commercialized reading generators.
           </p>
         </div>
 
-        <div className="overflow-x-auto rounded-2xl border border-slate-100 font-sans">
+        <div className="overflow-x-auto rounded-2xl border border-[#EADBCC] font-sans">
           <table className="w-full text-left border-collapse text-xs sm:text-sm">
             <thead>
-              <tr className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
+              <tr className="bg-amber-100/50 text-amber-950 font-bold border-b border-[#EADBCC]">
                 <th className="p-4">Advantage / Feature</th>
-                <th className="p-4 text-sky-700 bg-sky-50/50">GlowTales</th>
-                <th className="p-4">Paid / Social Sign-Up Alternatives</th>
+                <th className="p-4 text-amber-900 bg-amber-100/10">GlowTales</th>
+                <th className="p-4">Commercial AI Generators</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-600">
+            <tbody className="divide-y divide-[#EADBCC]/60 text-amber-900/90 font-medium">
               {comparisons.map((comp, idx) => (
-                <tr key={idx} className="hover:bg-slate-50/30">
-                  <td className="p-4 font-semibold text-slate-700">{comp.feature}</td>
-                  <td className="p-4 text-sky-800 bg-sky-50/20 font-medium">
-                    <span className="inline-flex items-center gap-1.5 text-emerald-700">
-                      <Check className="h-4 w-4 shrink-0 text-emerald-600 stroke-[2.5]" />
+                <tr key={idx} className="hover:bg-amber-100/10 transition">
+                  <td className="p-4 font-bold text-amber-950">{comp.feature}</td>
+                  <td className="p-4 text-amber-950 bg-amber-100/5 font-semibold">
+                    <span className="inline-flex items-center gap-1.5 text-emerald-800">
+                      <Check className="h-4 w-4 shrink-0 text-emerald-700 stroke-[2.5]" />
                       {comp.glowtales}
                     </span>
                   </td>
-                  <td className="p-4 text-slate-400">{comp.others}</td>
+                  <td className="p-4 text-amber-900/50 font-serif italic">{comp.others}</td>
                 </tr>
               ))}
             </tbody>
@@ -215,33 +213,31 @@ export default function WhyUs() {
         </div>
       </section>
 
-      {/* Interactive SEO Inspector & Key Phrases block */}
-      <section className="bg-gradient-to-tr from-slate-900 to-slate-850 text-white rounded-3xl p-6 sm:p-10 border border-slate-800 shadow-lg space-y-8 relative overflow-hidden" id="seo-inspector-section">
-        <div className="absolute -right-32 -bottom-32 h-80 w-80 rounded-full bg-sky-500/10 blur-3xl opacity-60" />
-        <div className="absolute -left-32 -top-32 h-80 w-80 rounded-full bg-violet-500/10 blur-3xl opacity-60" />
+      {/* SEO keywords section in matching warm card block */}
+      <section className="bg-gradient-to-br from-[#FAF6F0] to-[#F1E4D5] rounded-3xl p-6 sm:p-10 border border-[#EDCDBB] shadow-[#623010]/3 shadow-3xs space-y-8 text-left relative overflow-hidden" id="seo-inspector-section">
+        <div className="absolute -right-32 -bottom-32 h-80 w-80 rounded-full bg-orange-150/10 blur-3xl opacity-40" />
 
-        <div className="relative flex flex-col md:flex-row gap-8 justify-between items-start md:items-center border-b border-slate-800 pb-6">
+        <div className="relative flex flex-col md:flex-row gap-8 justify-between items-start md:items-center border-b border-[#E5CCA8]/80 pb-6">
           <div className="space-y-2 max-w-2xl">
-            <div className="inline-flex items-center gap-1 bg-sky-500/15 text-sky-400 px-2.5 py-1 rounded-md text-xs font-semibold border border-sky-500/20">
+            <div className="inline-flex items-center gap-1 bg-amber-105 text-amber-900 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border border-amber-250/30">
               <Search className="h-3.5 w-3.5" />
-              SEO Engine & Search Transparency
+              SEO & Accessibility Transparency
             </div>
-            <h2 className="text-xl sm:text-2xl font-sans font-medium text-slate-100">
-              Why We Optimize for Human Visibility First
+            <h2 className="text-xl sm:text-2xl font-display font-bold text-amber-950">
+              Helping Parents Find Safe Literature Instantly
             </h2>
-            <p className="text-xs sm:text-sm text-white leading-relaxed">
-              When parents query Google for accessible neurodivergent resources, they shouldn't find paid walls. This page is optimized with precise search phrases to make it easy for search engine bots (like Googlebot, Bing, and DuckDuckGo) to discover, crawl, and rank this free sanctuary. Check out our dynamic keyword indicators:
+            <p className="text-xs text-amber-900/80 leading-relaxed font-serif">
+              When parents query helpful tools for their children, they shouldn't find paid paywalls or intrusive trackers. This page maps rich search patterns to make it easy for search engine crawlers to catalog this free project.
             </p>
           </div>
 
-          {/* Dynamic tabs filter for SEO intent */}
-          <div className="flex gap-2 bg-slate-800 p-1 rounded-xl scrollbar-none scale-95 origin-left">
+          <div className="flex gap-2 bg-[#F3E6D8] border border-[#DECFBE] p-1 rounded-xl scale-95 origin-left">
             {["All", "Informational", "Transactional"].map((filter) => (
               <button
                 key={filter}
                 onClick={() => setActiveKeywordFilter(filter)}
-                className={`cursor-pointer px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition ${
-                  activeKeywordFilter === filter ? "bg-sky-600 text-white" : "text-slate-400 hover:text-slate-200"
+                className={`cursor-pointer px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  activeKeywordFilter === filter ? "bg-amber-600 text-white" : "text-amber-900 hover:text-amber-950"
                 }`}
                 id={`seo-filter-${filter}`}
               >
@@ -251,74 +247,72 @@ export default function WhyUs() {
           </div>
         </div>
 
-        {/* Dynamic target list */}
         <div className="relative grid grid-cols-1 sm:grid-cols-2 gap-4">
           {filteredKeywords.map((k, idx) => (
             <div 
               key={idx} 
-              className="bg-slate-850 border border-slate-800 rounded-2xl p-4 space-y-2 hover:border-sky-500/45 transition"
+              className="bg-[#FCFAF7] border border-[#ECD9C5] rounded-2xl p-4 space-y-2 hover:border-amber-600/40 transition"
             >
               <div className="flex items-center justify-between gap-2.5">
-                <span className="font-mono text-emerald-400 text-xs font-semibold block truncate">
+                <span className="font-mono text-amber-950 text-xs font-bold block truncate">
                   "{k.phrase}"
                 </span>
-                <span className="bg-slate-800 text-slate-300 text-[9px] font-bold px-2 py-0.5 rounded tracking-wide font-sans shrink-0 uppercase">
+                <span className="bg-amber-100 text-[#6B421A] text-[9px] font-bold px-2 py-0.5 rounded tracking-wide shrink-0 uppercase">
                   {k.intent}
                 </span>
               </div>
-              <p className="text-slate-450 text-[11px] leading-relaxed font-sans">{k.description}</p>
+              <p className="text-amber-800/80 text-[11px] leading-relaxed font-serif">{k.description}</p>
             </div>
           ))}
         </div>
 
-        {/* Structured SEO Scheme Card */}
-        <div className="relative bg-slate-850/50 border border-slate-800/80 rounded-2xl p-4 sm:p-6 space-y-4">
+        <div className="relative bg-[#FCFAF7]/40 border border-[#ECD9C5]/50 rounded-2xl p-4 sm:p-6 space-y-4">
           <div className="flex items-center gap-2">
-            <Globe className="h-4.5 w-4.5 text-sky-400" />
-            <h4 className="text-xs sm:text-sm font-semibold text-slate-200">Semantic & Technical Robots Indexing</h4>
+            <Globe className="h-4.5 w-4.5 text-amber-800" />
+            <h4 className="text-xs sm:text-sm font-bold text-amber-950">Robots Indexing Information</h4>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-[11px] font-mono leading-normal text-slate-350">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-[10px] sm:text-[11px] font-serif leading-relaxed text-amber-900/80">
             <div className="space-y-1">
-              <span className="text-[10px] text-sky-400 uppercase font-bold block mb-1">JSON-LD Schema</span>
-              <p className="text-slate-400 italic">"Licensed as a free Educational Pediatric web utility under Creative Commons, enabling rich Google snippets."</p>
+              <span className="text-[10px] text-amber-800 uppercase font-bold block font-sans mb-1">JSON-LD Schema</span>
+              <p className="italic">"Registered as a free licensed Pediatric learning resource, allowing Rich Snippets."</p>
             </div>
             <div className="space-y-1">
-              <span className="text-[10px] text-sky-400 uppercase font-bold block mb-1">Mobile Friendly Code</span>
-              <p className="text-slate-400">"Tailwind responsive layout passes Google's Core Web Vitals checks for immediate mobile indexation."</p>
+              <span className="text-[10px] text-amber-800 uppercase font-bold block font-sans mb-1">Adaptive Rendering</span>
+              <p className="itallc">"Dynamic responsive views pass Google Core-Web-Vitals accessibility checks instantly."</p>
             </div>
             <div className="space-y-1">
-              <span className="text-[10px] text-sky-400 uppercase font-bold block mb-1">No Login Obstacle</span>
-              <p className="text-slate-400">"Zero authentication barriers. Bots can crawl our core templates instantly, increasing page authority."</p>
+              <span className="text-[10px] text-amber-800 uppercase font-bold block font-sans mb-1 font-sans">Full Crawler Access</span>
+              <p>"No password obstructions. Search engine crawlers catalog templates directly, spreading keyword power."</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Trust Quote From Peter */}
-      <section className="bg-sky-50/50 rounded-3xl p-6 sm:p-10 border border-sky-100 flex flex-col md:flex-row gap-6 sm:gap-8 items-center" id="peter-accessibility-quote">
-        <div className="relative h-12 w-12 rounded-full bg-sky-600 text-white font-bold inline-flex items-center justify-center shrink-0 shadow-xs">
+      {/* Message from Peter */}
+      <section className="bg-[#FAF6F0] rounded-3xl p-6 sm:p-10 border border-[#EADBCC] flex flex-col md:flex-row gap-6 sm:gap-8 items-center text-left" id="peter-accessibility-quote">
+        <div className="relative h-12 w-12 rounded-full bg-amber-600 border border-amber-700 text-white font-extrabold inline-flex items-center justify-center shrink-0 shadow-xs">
           P
-          <div className="absolute -bottom-1.5 -right-1.5 bg-emerald-500 rounded-full p-0.5 text-white border border-white">
+          <div className="absolute -bottom-1.5 -right-1.5 bg-green-600 rounded-full p-0.5 text-white border border-white">
             <ShieldCheck className="h-3.5 w-3.5" />
           </div>
         </div>
         <div className="space-y-2">
-          <h3 className="text-base font-semibold text-slate-800 font-sans">A Message from a Father</h3>
-          <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-sans italic">
+          <h3 className="text-md font-bold text-amber-950 font-sans">A Father's Dedication</h3>
+          <p className="text-xs sm:text-sm text-[#46311E] leading-relaxed font-serif italic">
             "With a broad history of neurodivergence and autism in our family—running through my cousin, my nephew, two second cousins, and my own son on the spectrum—I have seen firsthand the endless flood of commercial services requiring monthly fees. Understanding a child's mind shouldn't come with a payment gateway. GlowTales is free, private, and requires no sign-up because pediatric accessibility is a necessity, not a commodity."
           </p>
-          <p className="text-[11px] font-bold text-sky-600 font-sans tracking-wide">— Peter Adam J. (peteradamj@gmail.com)</p>
+          <p className="text-xs font-bold text-amber-800 tracking-wide">— Peter Adam J. (peteradamj@gmail.com)</p>
         </div>
       </section>
 
-      {/* Dynamic CTA */}
-      <div className="text-center pt-4">
+      {/* Primary CTA */}
+      <div className="pt-4">
         <Link
           to="/create"
-          className="cursor-pointer inline-flex items-center gap-2 rounded-2xl bg-sky-600 hover:bg-sky-700 text-white px-8 py-4 text-sm font-semibold shadow-sm transition active:scale-95"
+          className="cursor-pointer inline-flex items-center gap-2 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white px-8 py-4 text-sm font-bold shadow-md transition active:scale-95"
           id="cta-whyus-start"
         >
-          <span>Create an Adventure Instantly</span>
+          <span>Craft a Tale Now</span>
           <ArrowRight className="h-4 w-4" />
         </Link>
       </div>

@@ -1,5 +1,4 @@
-// GlowTales Secure API Backend Layer
-// Version: 1.1.1 (Updated to ensure full local and container cross-environments synchronization)
+// GlowTales Warm Storytelling API Backend Layer
 import express from "express";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
@@ -9,7 +8,7 @@ dotenv.config();
 export const app = express();
 app.use(express.json({ limit: "15mb" }));
 
-// Custom high-compatibility CORS & Preflight middleware to allow cross-origin requests from Netlify / Vercel static frontends
+// Custom high-compatibility CORS & Preflight middleware to allow cross-origin requests
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, PATCH, DELETE");
@@ -25,8 +24,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Path-normalization middleware to ensure total compatibility when deployed under serverless environments (like Vercel)
-// Vercel may rewrite /api/generate-story to execute api/index.ts with req.url mapped to /generate-story or /api/generate-story.
+// Path-normalization middleware to ensure total compatibility when deployed under serverless environments
 app.use((req, res, next) => {
   const originalUrl = req.url;
   if (req.url.endsWith("/generate-story")) {
@@ -43,6 +41,7 @@ app.use((req, res, next) => {
 // Lazy initializer for Google Gen AI with dynamic hot-swapping support for updated keys
 let cachedApiKey: string | null = null;
 let aiInstance: GoogleGenAI | null = null;
+
 function getGoogleGenAI(): GoogleGenAI {
   const currentKey = (process.env.GEMINI_API_KEY || "").trim();
   if (!aiInstance || cachedApiKey !== currentKey) {
@@ -77,7 +76,7 @@ function getGoogleGenAI(): GoogleGenAI {
   return aiInstance;
 }
 
-// Helper to safely serialize any error object or stream into a searchable string representation
+// Helper to safely serialize any error object into a clean string representation
 function getCleanErrorString(error: any): string {
   if (!error) return "";
   if (typeof error === "string") return error;
@@ -156,7 +155,7 @@ function handleGeminiError(error: any, context = "action") {
   };
 }
 
-// Retry decorator to absorb 429 / 503 limits dynamically. Keep retries low (max 1) and delay fast to prevent gateway/proxy timeouts (30s limits) on serverless platforms.
+// Retry decorator to absorb transient 429 / 503 limits dynamically
 async function withRetry<T>(fn: () => Promise<T>, retries = 1, delay = 1000): Promise<T> {
   try {
     return await fn();
@@ -168,17 +167,12 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 1, delay = 1000): Pr
 
     const errorString = getCleanErrorString(error);
     const status = error?.status || error?.statusCode || (error?.response && error?.response?.status);
-    
-    // If daily free-tier quota is fully exhausted, retrying is futile and slow. Skip retry to fallback instantly.
     const isDailyQuotaExceeded = errorString.toLowerCase().includes("exceeded") && 
                                  (errorString.toLowerCase().includes("quota") || errorString.toLowerCase().includes("limit"));
     
     const isRetryable = (status === 429 || status === 503 || errorString.includes("429") || errorString.includes("503") || errorString.toLowerCase().includes("rate") || errorString.toLowerCase().includes("unavailable") || errorString.toLowerCase().includes("demand")) && !isDailyQuotaExceeded;
     
     if (!isRetryable || retries <= 0) {
-      if (isDailyQuotaExceeded) {
-        console.log("[Gemini Retry Bypassed] Daily quota limits reached, bypassing retry to trigger instant fallback cascade.");
-      }
       throw error;
     }
     const jitter = Math.random() * 400;
@@ -189,13 +183,12 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 1, delay = 1000): Pr
   }
 }
 
-
 // Debug Env Endpoint
 app.get("/api/debug-env", (req, res) => {
   const keys = Object.keys(process.env);
   const debugInfo: Record<string, string> = {};
   for (const k of keys) {
-    if (k.includes("API") || k.includes("GEMINI") || k.includes("GOOGLE") || k.includes("PORT") || k.includes("NODE")) {
+    if (k.includes("API") || k.includes("GEMINI") || k.includes("PORT") || k.includes("NODE")) {
       const val = process.env[k];
       debugInfo[k] = val ? (val.length <= 8 ? `[len: ${val.length}] ${val}` : `[len: ${val.length}] ${val.slice(0, 4)}...${val.slice(-4)}`) : "undefined";
     }
@@ -227,65 +220,52 @@ app.post("/api/generate-story", async (req, res) => {
       return res.status(400).json({ error: "Missing required fields (Child's Name and Special Interests)" });
     }
 
-    const narrativeWordCount = length === "Short" ? "around 250 words" : length === "Long" ? "around 600-750 words" : "around 400-500 words";
+    const approxWordCount = length === "Short" ? "200-300 words" : length === "Long" ? "600-800 words" : "400-500 words";
     
-    // Dynamic number of illustrations: Create 4-6 image prompts/markers for a short story. Short story -> 5 images. Else 4 images.
-    const numImages = length === "Short" ? 5 : 4;
-    const imageMarkers = Array.from({ length: numImages }, (_, i) => `[IMAGE_${i + 1}]`);
-    const imageTagsString = imageMarkers.join(", ");
-
     const triggerInjunction = triggers && triggers.trim() 
       ? (addressTriggers 
-          ? `Gently reference the potential sensory trigger "${triggers}" but render it completely peaceful, safe, organized, and totally in the control of or reassuring to ${name}. There are absolutely no loud sudden surprises, everything is perfectly quiet and tranquil.`
-          : `Ensure there is absolutely NO mention of sensory triggers like "${triggers}". Avoid loud noises, bright flashing lights, crowded spaces, or sudden unpredictable shifts. Keep the setting peaceful and calm.`)
-      : "Ensure the setting is completely safe, friendly, sensory-friendly, tidy, and predictable.";
+          ? `Gently reference the potential sensory trigger "${triggers}" but render it completely peaceful, safe, organized, quiet, and totally in the control of or reassuring to ${name}. Keep everything quiet and peaceful.`
+          : `Ensure there is absolutely NO mention or occurrence of sensory triggers like "${triggers}". Avoid loud noises, bright flashing lights, crowded spaces, or sudden unpredictable changes. Setting must remain steady and predictable.`)
+      : "Ensure the setting is completely safe, friendly, low-sensory, clean, and highly structured.";
 
     const appearanceClause = customAppearance && customAppearance.trim()
-      ? `For characterAppearance, you MUST use exactly this character appearance description: "${customAppearance.trim()}".
-You MUST incorporate this exact physical description in each and every element of 'suggestedIllustrations' to guarantee absolute character consistency without any drift.`
-      : `Create a hyper-detailed, highly consistent physical appearance description for ${name} (including detailed hairstyle/color, exact clothing description down to stripes, patterns, color shades, such as "a cozy or comfy knitted navy-blue sweater with exactly two horizontal grass-green hoops across the chest, simple beige sensory trousers, short straight ginger hair, and friendly round hazel eyes", pants, footwear, facial features, age) to be returned in 'characterAppearance'. Then, you MUST use this EXACT same description for ${name} in each and every element of 'suggestedIllustrations' to maintain strict character continuity across all drawings. Avoid any physical drift or clothing changes.`;
+      ? `Their appearance description is: "${customAppearance.trim()}". Weave their appearance into the coverIllustrationPrompt description.`
+      : `Create a comforting consistent description under characterAppearance (e.g., "a cheerful 8-year-old child wearing a cozy knitted soft yellow sweater, comfortable navy sensory-trousers, and friendly brown hair").`;
 
     const companionClause = companionName && companionName.trim()
-      ? `Include a secondary character / companion in the story names "${companionName.trim()}" who is a ${companionType || "friend/sibling/pet/friendly creature"}.${companionAppearance && companionAppearance.trim() ? ` Their exact consistent appearance is: "${companionAppearance.trim()}".` : ""} 
-Make sure this companion actively participates in the adventures with ${name} and is featured alongside ${name} consistently in the story text and the described illustrations in 'suggestedIllustrations'. Avoid any physical model drift for ${companionName.trim()} in the drawings.`
+      ? `Include a calm companion character named "${companionName.trim()}" who is a ${companionType || "friend"}.${companionAppearance && companionAppearance.trim() ? ` Description: "${companionAppearance.trim()}".` : ""} They support ${name} warmly.`
       : "";
 
-    const systemInstruction = `You are a gentle, nurturing pediatric psychologist and skilled children's book author specializing in calm, warm stories for neurodivergent (specifically autistic) children.
-Your story must adhere to the following neurodivergent-friendly guidelines:
-1. **Literal Language**: Write in clear, concrete, and reassuring phrases. Completely avoid abstract metaphors, idioms, sarcasm, or figures of speech which could be confusing or distressing.
-2. **Special Interests & Strengths**: Naturally weave the focus interests (${specialInterests}) into the core narrative as a point of discovery, happiness, and order. Let the main character's affinity for these interests be celebrated as an incredible superpower (e.g., rich attention to detail, hyperfocus, pattern recognition, or deep technical knowledge).
-3. **Safe & Predictable**: Write with steady, calm pacing. Provide reassurance that things are safe. Give comforting repetition if matching high repetition style. Guarantee a gentle, happy, and fully reassuring resolution with zero cliffhangers or shock events.
-4. **Markdown Formatting**: Output paragraphs in clean Markdown.
-5. **Image Markers**: In your content, insert EXACTLY ${numImages} markers: ${imageTagsString} on their own separate lines between logical story paragraphs. Do not clump them together. Spread them out evenly across the text. Make sure they are uppercase and on their own separate lines. e.g.
-Paragraph 1
+    const systemInstruction = `You are a warm, nurturing children's storytelling specialist and pediatric psychologist crafting low-stimulus, comforting personalized stories for neurodivergent (specifically autistic or sensory-sensitive) kids.
+Your writing style must follow these neurodivergent-friendly pillars:
+1. **Literal Language**: Write using clear, reassuring, concrete nouns. Avoid abstract metaphors, confusing figures of speech, idioms, or loud surprises.
+2. **Special Interests as Superpowers**: Weave ${name}'s passionate interest in "${specialInterests}" into the center of the story in a detailed, organized, and celebrated way. Autistic traits like intense focus, pattern-seeking, or systematic knowledge should be presented as wonderful strengths.
+3. **Structured & Calming**: Maintain slow, predictable pacing, offering reassuring statements that things are okay. Ensure a joyful, highly ordered, safe, and logical conclusion with zero sudden cliffhangers or scary surprises.
+4. **Divided pages**: You MUST structure the complete narrative divided into exactly 3 to 5 pages. Separate each page with a single line containing exactly:
+---
+This allows our warm book reader to let the child easily flip through pages sequentially without cognitive overload. Do not put '---' at the very beginning or end of the text.
+5. **No inline images**: Do NOT insert any image markers or illustrations inside the story chapters. This storybook has ONLY ONE single beautiful front cover image to prevent continuity issues.
+6. **Book Cover Description**: Draft a beautiful, highly detailed, serene cover image prompt focusing on ${name} and their special interest in ${specialInterests} in a soft, cozy, comforting setting.`;
 
-[IMAGE_1]
-
-Paragraph 2
-
-6. **Strict Pattern & Object Continuation in Illustration Descriptions**:
-- Generate exactly ${numImages} illustration descriptions in 'suggestedIllustrations' representing sequentially progressing scenes from the story (e.g. Image 1 is introduction, Image 2 is action, Image 3 is details, etc.). Every single description MUST be highly distinct, descriptive, and filled with peaceful environmental details. They must NEVER be duplicate, near-duplicate, or generic.
-- For each scene, specify what other characters or objects are present, where they are standing/sitting, and what background objects exist. Describe the exact structural continuation: "stands next to the same dark wooden bench near the exact same clean railroad tracks with the station sign in the top left".
-- Maintain total continuation: Keep every detail in perfect, sequential alignment. Ensure the child wears the exact same clothing (e.g., 'the exact same navy knitted sweater with two grass-green hoops across the chest', 'the exact same beige sensory trousers') in every single illustration description. If a train has carriages, explicitly state its exact design (e.g., 'a shiny sky-blue steam engine with pristine brass steam valves, exactly six solid bright red wheels, and two dark green passenger carriages attached behind it') in every single scene description. Never let colors, counts, or styles fluctuate randomly, as autistic kids deeply notice!`;
-
-    const prompt = `Write a personalized children's story for a child named ${name} who is ${age || "unknown"} years old, and uses pronouns "${pronouns || "they/them"}".
+    const prompt = `Write a comforting personalized story for ${name}, who is ${age || "unknown"} years old, uses pronouns "${pronouns || "they/them"}".
 Their special interest is: "${specialInterests}".
-Triggers/Sensory preferences to respect: "${triggers || "none"}".
-Action on triggers: ${triggerInjunction}
-${companionClause ? `Companion info: ${companionClause}` : ""}
-Requested format details:
-- **Story Length**: ${length || "Medium"} (~${narrativeWordCount})
--- **Pacing & Sensory Level**: ${sensoryLevel || "Low sensory, reassuring and repetitive"}
-- **Story Structure / Mood**: ${structure || "Calming bedtime story"}
-- **Narrative Perspective**: ${perspective || "Third-person"}
+Sensory comfort & trigger guideline: "${triggers || "none"}".
+Guideline processing: ${triggerInjunction}
+${companionClause}
 
-Appearance requirement:
+Requested Story Parameters:
+- **Story Length**: ${length || "Medium"} (~${approxWordCount})
+- **Sensory Level / Pacing**: ${sensoryLevel || "Standard low-sensory"}
+- **Mood / Book Structure**: ${structure || "Calming bedtime story"}
+- **Narrative Perspective**: ${perspective || "Third-person"}
 ${appearanceClause}
 
-Every single image description inside 'suggestedIllustrations' MUST start exactly with:
-"Soft pastel children's book illustration, calm style, clear lines, non-overwhelming: [detailed consistent character description]." followed by the specific scene elements. Ensure [detailed consistent character description] matches 'characterAppearance' exactly!
-
-Your response must be JSON matching the schema, with the title, the content including the ${numImages} image markers ([IMAGE_1] to [IMAGE_${numImages}]) on separate lines, a description of the consistent physical appearance of ${name} (for characterAppearance), a description of the key focus objects (for objectAppearance), exactly ${numImages} distinct illustration descriptions in suggestedIllustrations matching the [IMAGE_1] to [IMAGE_${numImages}] points, and the keyFeatures tags.`;
+Please structure your JSON response with:
+1. "title": a cozy, peaceful title (e.g. "Liam's Cozy Railway Adventure")
+2. "content": the complete story text, split into 3-5 pages separated by a line with exactly '---'. Keep each page's text beautiful and calming.
+3. "characterAppearance": a consistent, comforting description of the child's cozy physical appearance.
+4. "coverIllustrationPrompt": a highly descriptive portrait book-cover drawing prompt suitable for text-to-image. It MUST start precisely with: "Warm soft pastel children's book cover illustration, cozy background, clean borders, comforting style: [detailed scene depicting ${name} enjoying ${specialInterests} in a snug, eye-friendly setting]"
+5. "keyFeatures": of the story, containing "specialInterestUsed", "strengthsCelebrated", and "sensoryLevel".`;
 
     const config = {
       systemInstruction,
@@ -296,15 +276,10 @@ Your response must be JSON matching the schema, with the title, the content incl
           title: { type: Type.STRING },
           content: { 
             type: Type.STRING, 
-            description: `The complete markdown formatted text of the story. You MUST insert exactly ${numImages} tags: ${imageTagsString} on their own lines between paragraphs spread evenly.` 
+            description: "The complete storybook markdown text. Ensure you partition pages/chapters by a single line with exactly '---' (with 3-5 pages total)." 
           },
-          characterAppearance: { type: Type.STRING, description: "Consistent character appearance description (e.g. 'A small 7-year-old boy named Leo, wearing bright red overalls and a soft yellow cap, with copper hair and wide blue eyes')." },
-          objectAppearance: { type: Type.STRING, description: "Consistent main object appearance (e.g. 'A shiny sky-blue steam engine with pristine brass steam valves and exactly six bright red wheels')." },
-          suggestedIllustrations: {
-            type: Type.ARRAY,
-            items: { type: Type.STRING },
-            description: `Must contain exactly ${numImages} descriptions for images corresponding to each image spot [IMAGE_1] to [IMAGE_${numImages}] in order. Do not skip any spots.`
-          },
+          characterAppearance: { type: Type.STRING },
+          coverIllustrationPrompt: { type: Type.STRING },
           keyFeatures: {
             type: Type.OBJECT,
             properties: {
@@ -315,27 +290,22 @@ Your response must be JSON matching the schema, with the title, the content incl
             required: ["specialInterestUsed", "strengthsCelebrated", "sensoryLevel"]
           }
         },
-        required: ["title", "content", "characterAppearance", "objectAppearance", "suggestedIllustrations", "keyFeatures"]
+        required: ["title", "content", "characterAppearance", "coverIllustrationPrompt", "keyFeatures"]
       }
     };
 
     let response;
     let selectedModel = "gemini-3.5-flash";
     try {
-      console.log("Attempting story generation with highly responsive primary model: gemini-3.5-flash");
-      // Call primary model gemini-3.5-flash with retry for fast, stable structured JSON content
+      console.log("Generating cozy story text with primary model: gemini-3.5-flash");
       response = await withRetry(() => getGoogleGenAI().models.generateContent({
         model: "gemini-3.5-flash",
         contents: prompt,
         config
       }));
     } catch (err: any) {
-      if (isAuthOrPermissionError(err)) {
-        console.log("[Gemini Fallback System] Directly aborting fallback stream due to authorization configuration mismatch.", err);
-        throw err;
-      }
-
-      console.log("[Quota Fallback Info] Primary gemini-3.5-flash reached limit. Handled gracefully; falling back to gemini-3.1-flash-lite...");
+      if (isAuthOrPermissionError(err)) throw err;
+      console.log("[Quota Fallback] falling back to gemini-3.1-flash-lite...");
       try {
         selectedModel = "gemini-3.1-flash-lite";
         response = await withRetry(() => getGoogleGenAI().models.generateContent({
@@ -345,7 +315,7 @@ Your response must be JSON matching the schema, with the title, the content incl
         }));
       } catch (err2: any) {
         if (isAuthOrPermissionError(err2)) throw err2;
-        console.log("[Quota Fallback Info] Secondary gemini-3.1-flash-lite reached limit. Handled gracefully; falling back to gemini-2.5-flash...");
+        console.log("[Quota Fallback] falling back to gemini-2.5-flash...");
         try {
           selectedModel = "gemini-2.5-flash";
           response = await withRetry(() => getGoogleGenAI().models.generateContent({
@@ -354,59 +324,17 @@ Your response must be JSON matching the schema, with the title, the content incl
             config
           }));
         } catch (err3: any) {
-          if (isAuthOrPermissionError(err3)) throw err3;
-          console.log("[Quota Fallback Info] Tertiary gemini-2.5-flash reached limit. Handled gracefully; falling back to gemini-flash-latest...");
-          try {
-            selectedModel = "gemini-flash-latest";
-            response = await withRetry(() => getGoogleGenAI().models.generateContent({
-              model: "gemini-flash-latest",
-              contents: prompt,
-              config
-            }));
-          } catch (err4: any) {
-            console.log("[Gemini Fatal] All narrative models (gemini-3.5-flash, gemini-3.1-flash-lite, gemini-2.5-flash, gemini-flash-latest) failed.", err4);
-            throw err4;
-          }
+          throw err3;
         }
       }
     }
-
-    console.log(`Story successfully generated using model: ${selectedModel}`);
 
     if (!response.text) {
       throw new Error("No response text returned from Gemini API.");
     }
 
     const storyData = JSON.parse(response.text.trim());
-
-    // Programmatically enforce strict prefix formatting & absolute character consistency as requested
-    if (customAppearance && customAppearance.trim()) {
-      storyData.characterAppearance = customAppearance.trim();
-    }
-
-    const basePrefix = `Soft pastel children's book illustration, calm style, clear lines, non-overwhelming: ${storyData.characterAppearance}.`;
-
-    if (Array.isArray(storyData.suggestedIllustrations)) {
-      storyData.suggestedIllustrations = storyData.suggestedIllustrations.map((promptText: string) => {
-        let cleanText = promptText;
-        // Strip any existing "Soft pastel..." format markers the model might have output to avoid duplication
-        const prefixMarkers = [
-          "Soft pastel children's book illustration, calm style, clear lines, non-overwhelming:",
-          "Soft pastel children's book illustration, calm style, clear lines, non-overwhelming"
-        ];
-        for (const marker of prefixMarkers) {
-          if (cleanText.toLowerCase().includes(marker.toLowerCase())) {
-            const idx = cleanText.toLowerCase().indexOf(marker.toLowerCase()) + marker.length;
-            cleanText = cleanText.substring(idx);
-          }
-        }
-        // Slice off any leading punctuation
-        cleanText = cleanText.replace(/^[:\s,.]+/g, "").trim();
-        
-        return `${basePrefix} ${cleanText}`;
-      });
-    }
-
+    console.log(`Cozy story text successfully generated using model: ${selectedModel}`);
     return res.json(storyData);
 
   } catch (error: any) {
@@ -418,26 +346,18 @@ Your response must be JSON matching the schema, with the title, the content incl
   }
 });
 
-// Generate Image Endpoint
+// Generate Book Cover Image Endpoint (Generated dynamically once per storybook)
 app.post("/api/generate-image", async (req, res) => {
   try {
-    const { illustrationDescription, characterAppearance, objectAppearance, referencePhoto } = req.body;
+    const { coverIllustrationPrompt, referencePhoto, characterAppearance } = req.body;
 
-    if (!illustrationDescription) {
-      return res.status(400).json({ error: "Missing required parameter 'illustrationDescription'" });
+    if (!coverIllustrationPrompt) {
+      return res.status(400).json({ error: "Missing cover illustration prompt parameter" });
     }
 
-    // Since the backend already pre-formatted illustrationDescription to start exactly with the user's requested prefix, 
-    // we use it. If not, we construct it perfectly.
-    let fullImagePrompt = "";
-    if (illustrationDescription.startsWith("Soft pastel children's book illustration, calm style, clear lines, non-overwhelming:")) {
-      fullImagePrompt = `${illustrationDescription} ${objectAppearance ? `Main object: ${objectAppearance}.` : ''}`;
-    } else {
-      const characterDesc = characterAppearance || "A gentle child";
-      fullImagePrompt = `Soft pastel children's book illustration, calm style, clear lines, non-overwhelming: ${characterDesc}. ${illustrationDescription}. ${objectAppearance ? `Main object: ${objectAppearance}.` : ''}`;
-    }
-
-    // Convert reference base64 photo to a Gemini parts object if available
+    let finalPrompt = coverIllustrationPrompt;
+    
+    // Add custom reference image guidance if uploaded by user
     let refImagePart: any = null;
     if (referencePhoto && referencePhoto.includes("base64,")) {
       try {
@@ -450,60 +370,97 @@ app.post("/api/generate-image", async (req, res) => {
             data: base64Data
           }
         };
-        // Add instruction guiding the character style from reference image
-        fullImagePrompt = `In this illustration, capture the child's exact physical likeness (hair color/style, age, facial features) from the attached reference photo block, rendering them softly in: ${fullImagePrompt}`;
+        finalPrompt = `In this illustration, capture the child's exact physical likeness (hair style/color, facial features) from the attached reference photo block, rendering them softly in: ${coverIllustrationPrompt}`;
       } catch (err) {
         console.warn("Failed to parse reference photo base64 bytes:", err);
       }
     }
 
-    // Negative style enhancement to reinforce extreme consistency and simplicity for autistic comfort
-    fullImagePrompt += " Ensure there is zero clutter, zero sudden flashes or abstract graphics, and maximum detail continuity with matching backgrounds and clothes.";
+    // Append styling rules to enforce calm cozy aesthetics
+    finalPrompt += ", children's storybook style, soft warm colors, high-contrast clean borders, calming, serene setting, eye-friendly, beautiful illustration, ultra-clear lighting. Ensure there is absolutely zero noise, zero bright fluorescent sparks, and zero overwhelming abstract clutter.";
 
-    console.log("Generating illustration with prompt length:", fullImagePrompt.length);
+    console.log("Generating book cover illustration with prompt length:", finalPrompt.length);
 
     const partsPayload: any[] = [];
     if (refImagePart) {
       partsPayload.push(refImagePart);
     }
-    partsPayload.push({ text: fullImagePrompt });
+    partsPayload.push({ text: finalPrompt });
 
-    // Helper for offline generic beautiful canvas SVGs when all APIs fail
-    const generateOfflineFallbackSvg = (desc: string, char: string, obj: string) => {
-      const seedText = desc + char + obj;
-      const paletteBackgrounds = ["#F1F5F9", "#FFFBEB", "#FDF2F8", "#F0FDF4", "#EFF6FF", "#FAF5FF"];
-      const bgIdx = Math.abs(seedText.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)) % paletteBackgrounds.length;
-      const bgColor = paletteBackgrounds[bgIdx];
+    // Vector SVG fallback when model quota/demand is exceeded or API is unconfigured
+    const generateCozyCoverSvg = (title: string, promptText: string) => {
+      const cleanPrompt = promptText.replace(/Warm soft pastel children's book cover illustration.*?:/gi, "").trim();
+      const croppedPrompt = cleanPrompt.length > 200 ? cleanPrompt.substring(0, 197) + "..." : cleanPrompt;
 
-      // Format caption
-      const cleanDesc = desc.replace("Soft pastel children's book illustration, calm style, clear lines, non-overwhelming:", "").trim();
-      const croppedDesc = cleanDesc.length > 150 ? cleanDesc.substring(0, 147) + "..." : cleanDesc;
+      // Color scheme for warm comforting feeling (terracotta cream)
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800" style="background: linear-gradient(135deg, #FAF6F0 0%, #F5E8DB 100%); font-family: 'Quicksand', 'Lora', system-ui, sans-serif;">
+        <!-- Soft background decorative elements -->
+        <rect x="20" y="20" width="560" height="760" rx="36" fill="none" stroke="#E6C8AD" stroke-width="4" opacity="0.6" />
+        <rect x="35" y="35" width="530" height="730" rx="28" fill="none" stroke="#E6C8AD" stroke-width="1.5" opacity="0.4" />
+        
+        <!-- Ambient forest canopy / mountain hills in background -->
+        <path d="M-50 820 Q 150 630, 400 820 Z" fill="#EBDAC4" opacity="0.5" />
+        <path d="M200 820 Q 420 590, 680 820 Z" fill="#E6D3B8" opacity="0.4" />
+        <path d="M50 820 Q 300 680, 550 820 Z" fill="#DFCAA9" opacity="0.6" />
 
-      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" style="background-color:${bgColor}; font-family: 'Inter', system-ui, sans-serif;">
-        <rect x="25" y="25" width="750" height="400" rx="32" fill="none" stroke="rgba(0,0,0,0.04)" stroke-width="8"/>
-        <circle cx="120" cy="110" r="140" fill="rgba(255,255,255,0.4)"/>
-        <circle cx="120" cy="110" r="100" fill="rgba(255,255,255,0.6)"/>
-        <path d="M-100 450 Q 150 250, 400 450 Z" fill="rgba(255, 255, 255, 0.45)"/>
-        <path d="M250 450 Q 550 220, 850 450 Z" fill="rgba(255, 255, 255, 0.5)"/>
-        <path d="M100 450 Q 400 320, 700 450 Z" fill="rgba(255, 255, 255, 0.6)"/>
-        <circle cx="340" cy="80" r="6" fill="#FBBF24" opacity="0.6"/>
-        <circle cx="580" cy="140" r="4" fill="#FBBF24" opacity="0.5"/>
-        <circle cx="230" cy="190" r="3" fill="#3B82F6" opacity="0.4"/>
-        <circle cx="710" cy="110" r="5" fill="#3B82F6" opacity="0.4"/>
-        <g transform="translate(400, 200)">
-          <path d="M -90,-20 Q -60,-80 0,-40 Q 60,-80 90,-20 Q 130,10 90,50 Q 40,80 0,60 Q -45,80 -90,40 Q -130,15 -90,-20 Z" fill="white" opacity="0.8"/>
-          <g transform="scale(0.8) translate(-10, -5)">
-            <path d="M -60,20 L 60,20 L 70,35 L -50,35 Z" fill="#475569" opacity="0.75"/>
-            <path d="M -60,5 L 60,5 L 60,20 L -60,20 Z" fill="#3B82F6" opacity="0.8"/>
-            <path d="M -50,11 L 50,11" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
-            <path d="M 0,-30 C -10,-45 -25,-30 0,0 C 25,-30 10,-45 0,-30 Z" fill="#F59E0B" opacity="0.9" transform="scale(0.8)"/>
+        <!-- Peaceful Sun/Moon glowing in top right -->
+        <circle cx="480" cy="160" r="70" fill="#FFF6EA" filter="drop-shadow(0px 4px 12px rgba(254,233,203,0.5))" />
+        <circle cx="480" cy="160" r="50" fill="#FFE8C8" opacity="0.7" />
+
+        <!-- Glowing lanterns / fireflies -->
+        <circle cx="120" cy="400" r="5" fill="#FBBF24" opacity="0.8" />
+        <circle cx="120" cy="400" r="14" fill="#FBBF24" opacity="0.2" />
+        <circle cx="500" cy="480" r="4" fill="#FBBF24" opacity="0.7" />
+        <circle cx="500" cy="480" r="12" fill="#FBBF24" opacity="0.15" />
+        <circle cx="200" cy="310" r="3" fill="#FBBF24" opacity="0.8" />
+
+        <!-- Large central book cover illustration card frame -->
+        <g transform="translate(100, 240)">
+          <!-- Inner frame background -->
+          <rect x="0" y="0" width="400" height="340" rx="24" fill="#FCFAF7" filter="drop-shadow(0px 8px 16px rgba(120,60,30,0.06))" />
+          <rect x="0" y="0" width="400" height="340" rx="24" fill="none" stroke="#ECE0D1" stroke-width="2" />
+          
+          <!-- Cozy centralized symbol illustration - cute sleeping fox & glowing stars in hills -->
+          <g transform="translate(200, 160) scale(1.1)">
+            <!-- Sleeping hills -->
+            <path d="M-100 80 C-40 20 40 20 100 80 Z" fill="#EDE4D9" />
+            <!-- Glowing Moon -->
+            <path d="M-40 -40 A 30 30 0 1 0 10 -40 A 24 24 0 1 1 -40 -40" fill="#FCD34D" opacity="0.8" />
+            <!-- Little Sleeping Fox/Creature -->
+            <path d="M-15,30 C-30,30 -40,40 -45,55 C-45,60 -35,65 -25,65 C-15,65 -5,60 -2,55 C0,45 -2,40 -15,30 Z" fill="#E87C43" />
+            <path d="M-5,45 C-1,45 8,48 10,55 C12,60 5,65 -2,65 C-9,65 -15,60 -15,55 Z" fill="#E5E7EB" opacity="0.9" />
+            <!-- Sleeping curvy tails -->
+            <path d="M-40,55 C-50,55 -60,65 -45,70 C-30,75 -25,65 -40,55 Z" fill="#E87C43" />
+            <!-- Tiny closed eyes -->
+            <path d="M-22,50 Q-18,52 -14,50" fill="none" stroke="#2D1C12" stroke-width="1.8" stroke-linecap="round" />
+            
+            <!-- Twinkling cover stars -->
+            <polygon points="0,-10 3,-3 10,-3 5,2 7,9 0,5 -7,9 -5,2 -10,-3 -3,-3" fill="#FFE8C8" transform="translate(50, -20) scale(0.8)" />
+            <polygon points="0,-10 3,-3 10,-3 5,2 7,9 0,5 -7,9 -5,2 -10,-3 -3,-3" fill="#FFE8C8" transform="translate(-60, 10) scale(0.6)" opacity="0.5" />
           </g>
         </g>
-        <g transform="translate(100, 310)">
-          <rect x="0" y="0" width="600" height="90" rx="20" fill="white" opacity="0.95" />
-          <rect x="0" y="0" width="600" height="90" rx="20" fill="none" stroke="rgba(0,0,0,0.05)" stroke-width="1.5" />
-          <text x="300" y="38" text-anchor="middle" fill="#0F172A" font-size="14" font-weight="600" letter-spacing="-0.01em">Cozy Story Illustration</text>
-          <text x="300" y="62" text-anchor="middle" fill="#64748B" font-size="11.5" font-weight="400" letter-spacing="0.01em">${croppedDesc}</text>
+        
+        <!-- Elegant children storybook text alignment -->
+        <g transform="translate(300, 140)">
+          <text text-anchor="middle" fill="#5F3A15" font-size="28" font-family="'Fraunces', Georgia, serif" font-weight="800" letter-spacing="-0.02em" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.03))">${title || "A Cozy GlowTale"}</text>
+          <text y="35" text-anchor="middle" fill="#9C6B43" font-size="12" font-weight="700" letter-spacing="0.15em">PERSONALIZED EDITION</text>
+        </g>
+
+        <!-- Brief cover prompt overlay for tactile visualization -->
+        <g transform="translate(60, 615)">
+          <rect x="0" y="0" width="480" height="90" rx="18" fill="#FFFDFB" fill-opacity="0.9" stroke="#F1E6D9" stroke-width="1.5" />
+          <text x="240" y="28" text-anchor="middle" fill="#6A4926" font-size="12" font-weight="600">Cover Scene Description</text>
+          <text x="240" y="48" text-anchor="middle" fill="#8D755E" font-size="10" font-weight="400" width="400">
+            <tspan x="240" dy="0">${croppedPrompt.substring(0, 75)}</tspan>
+            <tspan x="240" dy="16">${croppedPrompt.substring(75, 150)}</tspan>
+          </text>
+        </g>
+        
+        <!-- Star indicators on bottom -->
+        <g transform="translate(300, 735) scale(0.85)">
+          <circle cx="-35" cy="0" r="3" fill="#DEC39E" />
+          <circle cx="0" cy="0" r="5" fill="#C5965E" />
+          <circle cx="35" cy="0" r="3" fill="#DEC39E" />
         </g>
       </svg>`;
     };
@@ -520,7 +477,7 @@ app.post("/api/generate-image", async (req, res) => {
         },
         config: {
           imageConfig: {
-            aspectRatio: "16:9",
+            aspectRatio: "3:4", // Beautiful book portrait aspect ratio!
           },
         },
       }));
@@ -539,11 +496,11 @@ app.post("/api/generate-image", async (req, res) => {
         throw new Error("Gemini image model did not return inline image bytes.");
       }
 
-      console.log(`Illustration successfully generated using model: ${selectedImageModel}`);
+      console.log(`Cover illustration successfully generated using model: ${selectedImageModel}`);
       return res.json({ imageUrl: `data:image/png;base64,${base64ImageBytes}` });
 
     } catch (imageErr: any) {
-      console.log("[Image Quota Info] gemini-2.5-flash-image hit a quiet spot. Trying secondary model gemini-3.1-flash-image as dynamic fallback...");
+      console.log("[Image Cover Fallback Warning] gemini-2.5-flash-image hit a quota cap. Falling back to gemini-3.1-flash-image...");
       
       try {
         selectedImageModel = "gemini-3.1-flash-image";
@@ -554,7 +511,7 @@ app.post("/api/generate-image", async (req, res) => {
           },
           config: {
             imageConfig: {
-              aspectRatio: "16:9",
+              aspectRatio: "3:4",
             },
           },
         }));
@@ -573,28 +530,26 @@ app.post("/api/generate-image", async (req, res) => {
           throw new Error("Gemini image model did not return inline image bytes.");
         }
 
-        console.log(`Illustration successfully generated using model: ${selectedImageModel}`);
+        console.log(`Cover illustration successfully generated using model: ${selectedImageModel}`);
         return res.json({ imageUrl: `data:image/png;base64,${base64ImageBytes}` });
 
       } catch (imageErr2: any) {
-        console.log("[Image Quota Info] Both Imagen models returned resource limits or are unlicensed. Invoking Intelligent SVG Drawing Fallback via Gemini Text Engine...");
+        console.log("[Image Cover Fallback Info] Both Imagen models returned resource limits or are unlicensed. Generating high-quality customized vector book cover SVG...");
         
         try {
-          // Fall back to generating highly customized raw SVG tags using the perfectly working gemini-2.5-flash text model!
+          // Soft, soothing cover template
           const fallbackModel = "gemini-2.5-flash";
-          const svgPrompt = `You are a professional children's book vector illustrator. Since the specialized image model has hit temporary service limits, we need you to design a high-quality, soothing, and beautifully aligned children's book illustration in standard SVG format.
+          const svgPrompt = `You are a professional children's book illustrator. Since our specialized image model is at full rate capacity right now, we need you to render a beautiful children's book portrait cover illustration in standard raw SVG format.
 
-The illustration is for a sensitive, autistic child. It must have:
-1. Soothing, gentle pastel background color (e.g., soft lavender, sky blue, sage, peach, mint, pale gold).
-2. Clean, safe, modern minimalist vector styles. No aggressive, jagged, or chaotic shapes. Keep it simple, neat, structured and highly comforting.
-3. Incorporate the core components described here:
-   - Setting/Scene outline: "${illustrationDescription}"
-   - Main Character appearance to depict: "${characterAppearance || "A gentle child"}"
-   - Major Object / Toy / Interest to depict: "${objectAppearance || "Sensory interest/toy"}"
+The illustration is for a sensitive, autistic child and should depict:
+- Child attributes: "${characterAppearance || "A friendly child"}"
+- Setting/Theme description: "${coverIllustrationPrompt}"
 
-Return ONLY a single valid raw <svg> string. Ensure the SVG has viewBox="0 0 800 450" (16:9 ratio) and is fully self-contained, valid XML with beautiful stylized shapes, paths, lines, or circles depicting a lovely abstract or structured representation of the scene.
-Make sure you preserve visual continuity of colors (e.g. if the character's clothing says "navy blue sweater with grass green hoops", use matching blues and greens!).
-Do NOT output any markdown (no \`\`\`xml or \`\`\`svg wrappers). Start your response exactly with "<svg" and close with "</svg>".`;
+Please return ONLY a valid inline <svg> block. 
+1. The viewport must be exactly: viewBox="0 0 600 800" (portrait format).
+2. It should have a warm pale background plate, simple comforting lines, charming curves, circular highlights, glowing stars, representing the theme beautifully.
+3. No fluorescent or overwhelming shapes, no sharp edges. Comforting pastel hues.
+4. Keep the code fully compatible. No markdown wrappers (\`\`\`svg or \`\`\`xml). Start your response directly with "<svg" and close with "</svg>".`;
 
           const fallbackResponse = await withRetry(() => getGoogleGenAI().models.generateContent({
             model: fallbackModel,
@@ -611,18 +566,18 @@ Do NOT output any markdown (no \`\`\`xml or \`\`\`svg wrappers). Start your resp
           }
 
           if (svgContent.startsWith("<svg") && svgContent.includes("</svg>")) {
-            console.log("Vector fallback SVG generated successfully by Gemini text engine!");
+            console.log("Vector cover illustration generated perfectly by Gemini Text Engine!");
             const base64Bytes = Buffer.from(svgContent).toString("base64");
             return res.json({ 
               imageUrl: `data:image/svg+xml;base64,${base64Bytes}`,
               isVectorFallback: true 
             });
           } else {
-            throw new Error("Invalid XML/SVG content returned from fallback model");
+            throw new Error("Invalid inline SVG content from cover model.");
           }
-        } catch (svgFallbackErr: any) {
-          console.log("[Image Fallback Info] Vector fallback SVG generation failed, invoking offline generic SVG generator.", svgFallbackErr?.message || svgFallbackErr);
-          const offlineSvg = generateOfflineFallbackSvg(illustrationDescription, characterAppearance || "", objectAppearance || "");
+        } catch (svgCoverErr: any) {
+          console.log("[Image Fallback Info] Cover SVG generation failed, generating offline beautiful cover visual:", svgCoverErr?.message || svgCoverErr);
+          const offlineSvg = generateCozyCoverSvg("Your Little Story", coverIllustrationPrompt);
           const base64Bytes = Buffer.from(offlineSvg).toString("base64");
           return res.json({ 
             imageUrl: `data:image/svg+xml;base64,${base64Bytes}`,
@@ -634,7 +589,7 @@ Do NOT output any markdown (no \`\`\`xml or \`\`\`svg wrappers). Start your resp
     }
 
   } catch (error: any) {
-    const errorDetails = handleGeminiError(error, "illustration generation");
+    const errorDetails = handleGeminiError(error, "book cover generation");
     res.status(errorDetails.status).json({
       error: errorDetails.error,
       details: errorDetails.details

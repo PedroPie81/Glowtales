@@ -1,37 +1,30 @@
-// GlowTales Comfort Library Client Component
-// Version: 1.1.2 (Supports local favorites preservation and predictive story restoration)
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { StoryInput, StoryResult } from "../types";
 import { 
   Sparkles, 
-  HelpCircle, 
   ChevronRight, 
+  ChevronLeft,
   User, 
   Heart, 
-  EyeOff, 
-  Settings2, 
-  Loader2, 
   BookOpen, 
   AlertCircle, 
   RefreshCw,
   Trophy,
-  Activity,
   Smile,
-  X,
+  Trash2,
+  Bookmark,
   Camera,
-  UploadCloud,
-  SkipBack,
-  Users,
-  Trash2
+  Layers,
+  Sparkle,
+  Loader2
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import StoryIllustration from "./StoryIllustration";
 
 export default function CreateStory() {
-  // 1. Inputs State
+  // 1. Form Data State
   const [formData, setFormData] = useState<StoryInput>({
     name: "",
-    age: "",
+    age: "7",
     pronouns: "they/them",
     specialInterests: "",
     triggers: "",
@@ -40,1159 +33,858 @@ export default function CreateStory() {
     sensoryLevel: "Low sensory, reassuring and repetitive",
     structure: "Calming bedtime story with orderly resolution",
     perspective: "Third-person",
-    includeIllustrations: false,
-    visualStyle: "watercolor",
-    customAppearance: "",
-    referencePhoto: "",
-    companionName: "",
-    companionType: "friend",
-    companionAppearance: ""
+    customAppearance: ""
   });
 
-  const [showCompanionForm, setShowCompanionForm] = useState(false);
+  // 2. Navigation / Tab Step inside Form
+  const [activeFormStep, setActiveFormStep] = useState<"profile" | "pacing" | "theme">("profile");
 
-  // 2. Generation & Output State
-  const [isGeneratingStory, setIsGeneratingStory] = useState(false);
-  const [storyResult, setStoryResult] = useState<StoryResult | null>(null);
-  const [generationError, setGenerationError] = useState<{ message: string; details?: string; isRateLimit: boolean } | null>(null);
+  // 3. Generation and Cover Image states
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [loadingMessageIdx, setLoadingMessageIdx] = useState(0);
+  const [story, setStory] = useState<StoryResult | null>(null);
+  const [coverImageLoading, setCoverImageLoading] = useState(false);
+  const [errorState, setErrorState] = useState<{ message: string; details?: string } | null>(null);
 
-  // Individual image generation status
-  // record index -> boolean
-  const [generatingImages, setGeneratingImages] = useState<Record<number, boolean>>({});
-  // record index -> error text
-  const [imageErrors, setImageErrors] = useState<Record<number, string>>({});
-  
-  // Custom narrative creation step
-  const [activeFormStep, setActiveFormStep] = useState<"profile" | "comfort" | "format">("profile");
+  // 4. Bookshelf list of stories stored in localStorage
+  const [bookshelf, setBookshelf] = useState<StoryResult[]>([]);
+  // Currently read page (0 = Cover page, 1 = Page 1, etc.)
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
+  // Text size toggle for sensitive custom readers
+  const [readerFontSize, setReaderFontSize] = useState<"md" | "lg" | "xl">("lg");
 
-  // Local Favorites Library State
-  const [favorites, setFavorites] = useState<StoryResult[]>([]);
+  // Loading messages loop
+  const loadingMessages = [
+    "Kindling the fireplace embers...",
+    "Gathering golden warm ink...",
+    "Whispering story ideas to the birds...",
+    "Knitting magical blankets for the stars...",
+    "Placing a cozy bookmark in your imagination...",
+    "Tuning the clock to serene bedtime hours..."
+  ];
 
   useEffect(() => {
-    const saved = localStorage.getItem("glowtales_library");
+    let timer: NodeJS.Timeout;
+    if (isGenerating) {
+      timer = setInterval(() => {
+        setLoadingMessageIdx(prev => (prev + 1) % loadingMessages.length);
+      }, 5000);
+    }
+    return () => clearInterval(timer);
+  }, [isGenerating]);
+
+  // Load bookshelf on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("glowtales_library_v2");
     if (saved) {
       try {
-        setFavorites(JSON.parse(saved));
+        setBookshelf(JSON.parse(saved));
       } catch (e) {
-        console.error("Failed to parse favorites library:", e);
+        console.error("Failed to read shelf:", e);
       }
     }
   }, []);
 
-  const handleSaveToFavorites = () => {
-    if (!storyResult) return;
-    const exists = favorites.some(fav => fav.title === storyResult.title);
-    let updated: StoryResult[];
+  // Save changes to bookshelf helper
+  const saveBookshelfToStorage = (updated: StoryResult[]) => {
+    setBookshelf(updated);
+    localStorage.setItem("glowtales_library_v2", JSON.stringify(updated));
+  };
+
+  // Helper to append a book to our personal hand-carved bookshelf!
+  const handleAddToBookshelf = () => {
+    if (!story) return;
+    const exists = bookshelf.some(b => b.title === story.title);
     if (exists) {
-      // Remove if already clicked (toggle behavior)
-      updated = favorites.filter(fav => fav.title !== storyResult.title);
+      // Toggle delete
+      const filtered = bookshelf.filter(b => b.title !== story.title);
+      saveBookshelfToStorage(filtered);
     } else {
-      updated = [storyResult, ...favorites];
-    }
-    setFavorites(updated);
-    localStorage.setItem("glowtales_library", JSON.stringify(updated));
-  };
-
-
-
-  // Helper helper to handle form defaults or help triggers
-  const fillSampleInterest = (interest: string, triggers: string = "") => {
-    setFormData(prev => ({ ...prev, specialInterests: interest, triggers }));
-  };
-
-  // Dynamic API Base URL logic for cloud-resilient orchestration: 
-  // Determines if we are running locally within AI Studio, or shared on a Cloud Run container.
-  // We prioritize high-compatibility relative routing for local containers, Vercel subdomains, and official containers.
-  const getApiUrl = (path: string): string => {
-    const hostname = window.location.hostname;
-    // If we are on local dev, a .run.app container, or a .vercel.app deployment, relative routing is used.
-    const isLocalOrCloudRunContainer = 
-      hostname.includes("run.app") || 
-      hostname.includes("vercel.app") || 
-      hostname.includes("localhost") || 
-      hostname.includes("127.0.0.1") || 
-      hostname.includes("googleusercontent.com") || 
-      hostname.includes("google") || 
-      hostname.includes("aistudio") || 
-      hostname.startsWith("192.") || 
-      hostname.startsWith("10.");
-    if (isLocalOrCloudRunContainer) {
-      return path;
-    }
-    // For other custom domains, we first try relative routes in fetchWithRetry.
-    // If the server doesn't respond or returns static SPA fallback HTML (meaning they only deployed static files),
-    // we seamlessly redirect backend calls to our AI Studio container backend.
-    return path;
-  };
-
-  // Robust fetch retry helper that intelligently handles local backends, static hosting fallbacks,
-  // server reboots, cold starts, and intermittent network limits.
-  const fetchWithRetry = async (url: string, options: RequestInit, retries = 4, delay = 1500): Promise<Response> => {
-    const targetUrl = url.startsWith("/api") ? getApiUrl(url) : url;
-    
-    try {
-      const response = await fetch(targetUrl, options);
-      const contentType = response.headers.get("content-type") || "";
-      const isHtml = contentType.includes("text/html") || response.status === 502 || response.status === 503 || response.status === 504;
-
-      // Detect if we got HTML on an API route from a custom domain (indicating a static fallback page / 404 on host like Netlify/Github Pages)
-      const hostname = window.location.hostname;
-      const isStaticOnlyFallback = isHtml && url.startsWith("/api") && 
-        !hostname.includes("localhost") && 
-        !hostname.includes("127.0.0.1") && 
-        !hostname.includes("run.app") && 
-        !hostname.includes("vercel.app") &&
-        !hostname.includes("googleusercontent.com") &&
-        !hostname.includes("google") &&
-        !hostname.includes("aistudio");
-
-      if (isStaticOnlyFallback) {
-        // Redirect the request to our pre-compiled AI Studio container backend
-        const stableContainerBackendUrl = "https://ais-dev-n63434nzcpnc5bhqrly7ct-92816011625.europe-west2.run.app";
-        const fallbackUrl = `${stableContainerBackendUrl}${url}`;
-        console.warn(`[API Dynamic Fallback] Static-only host detected (API returned HTML fallback). Delegating request to AI Studio container backend: ${fallbackUrl}`);
-        
-        try {
-          const fallbackRes = await fetch(fallbackUrl, options);
-          return fallbackRes;
-        } catch (fallbackErr) {
-          console.error("[API Dynamic Fallback] Cloud Run fallback backend was unreachable:", fallbackErr);
-          // Fall through to return the original HTML response to be parsed and raise a clear connection reload notice
-        }
-      }
-
-      // Detect if we are on a deployed custom/Vercel host and got a JSON API Key missing, unauthorized, or scopes error
-      const expectsDynamicFallback = url.startsWith("/api") && 
-        !hostname.includes("localhost") && 
-        !hostname.includes("127.0.0.1") && 
-        !hostname.includes("run.app") &&
-        !hostname.includes("googleusercontent.com") &&
-        !hostname.includes("google") &&
-        !hostname.includes("aistudio");
-
-      if (expectsDynamicFallback && !isHtml && !response.ok) {
-        try {
-          const clonedRes = response.clone();
-          const json = await clonedRes.json();
-          const looksLikeApiKeyIssue = json?.error && (
-            json.error.toLowerCase().includes("api key") || 
-            json.error.toLowerCase().includes("missing") || 
-            json.error.toLowerCase().includes("unauthorized") || 
-            json.error.toLowerCase().includes("scope")
-          );
-          if (looksLikeApiKeyIssue) {
-            const stableContainerBackendUrl = "https://ais-dev-n63434nzcpnc5bhqrly7ct-92816011625.europe-west2.run.app";
-            const fallbackUrl = `${stableContainerBackendUrl}${url}`;
-            console.warn(`[API Key Fallback] Deployed backend returned API key/scope error. Falling back directly to secure Cloud Run backend: ${fallbackUrl}`);
-            try {
-              const fallbackRes = await fetch(fallbackUrl, options);
-              return fallbackRes;
-            } catch (fallbackErr) {
-              console.error("[API Key Fallback] Cloud Run fallback backend was unreachable:", fallbackErr);
-            }
-          }
-        } catch (cloneErr) {
-          // Ignore parsing issues and progress
-        }
-      }
-
-      if (isHtml && retries > 0) {
-        console.warn(`[Client-Side Retry] Server restarting or HTML received (status: ${response.status}). Retrying in ${delay}ms... (${retries} attempts left)`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        return fetchWithRetry(url, options, retries - 1, delay * 1.5);
-      }
-
-      return response;
-    } catch (err) {
-      // If a network connection error was thrown (meaning no backend is listening on this domain at all, common for pure static frontends)
-      const hostname = window.location.hostname;
-      const isCustomStaticHost = url.startsWith("/api") && 
-        !hostname.includes("localhost") && 
-        !hostname.includes("127.0.0.1") && 
-        !hostname.includes("run.app") && 
-        !hostname.includes("vercel.app") &&
-        !hostname.includes("googleusercontent.com") &&
-        !hostname.includes("google") &&
-        !hostname.includes("aistudio");
-
-      if (isCustomStaticHost) {
-        const stableContainerBackendUrl = "https://ais-dev-n63434nzcpnc5bhqrly7ct-92816011625.europe-west2.run.app";
-        const fallbackUrl = `${stableContainerBackendUrl}${url}`;
-        try {
-          console.warn(`[API Dynamic Fallback] Connection failed. Delegating request to AI Studio container backend: ${fallbackUrl}`);
-          return await fetch(fallbackUrl, options);
-        } catch (fallbackErr) {
-          console.error("[API Dynamic Fallback] Cloud Run fallback backend was unreachable:", fallbackErr);
-        }
-      }
-
-      if (retries > 0) {
-        console.warn(`[Client-Side Retry] Connection error. Retrying in ${delay}ms... (${retries} attempts left)`, err);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        return fetchWithRetry(url, options, retries - 1, delay * 1.5);
-      }
-      throw err;
+      const newBook: StoryResult = {
+        ...story,
+        id: `story_${Date.now()}`,
+        createdAt: new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+      };
+      saveBookshelfToStorage([newBook, ...bookshelf]);
     }
   };
 
-  // 3. API Handlers
-  const handleGenerateStory = async (e: React.FormEvent) => {
+  const handleRemoveFromBookshelf = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = bookshelf.filter(b => b.id !== id);
+    saveBookshelfToStorage(updated);
+  };
+
+  // Pre-fill cozy presets for fast testing / comforting suggestions
+  const handleQuickPreset = (interest: string, triggersText: string) => {
+    setFormData(prev => ({
+      ...prev,
+      specialInterests: interest,
+      triggers: triggersText,
+      name: "Leo"
+    }));
+  };
+
+  // Submits form and orchestrates backend API call
+  const generatePersonalizedStory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) {
-      alert("Please enter the child's name so we can make them the star of the tale!");
+      alert("Please enter the child's name so they can be the cozy star of their novel!");
       return;
     }
     if (!formData.specialInterests.trim()) {
-      alert("Please specify a special interest or passionate topic!");
+      alert("Please detail their special interests (such as trains, clocks, or space maps)!");
       return;
     }
 
-    setIsGeneratingStory(true);
-    setGenerationError(null);
-    setStoryResult(null);
-    setGeneratingImages({});
-    setImageErrors({});
-
-
+    setIsGenerating(true);
+    setCoverImageLoading(true);
+    setErrorState(null);
+    setStory(null);
+    setCurrentPageIndex(0);
 
     try {
-      const response = await fetchWithRetry(`/api/generate-story?cb=${Date.now()}`, {
+      // Step A: Generate narrative and cover prompt
+      const storyRes = await fetch("/api/generate-story", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData)
       });
 
-      let data: any;
-      const contentType = response.headers.get("content-type") || "";
-      if (contentType.includes("application/json")) {
-        data = await response.json();
-      } else {
-        const rawText = await response.text();
-        const isHtml = rawText.trim().startsWith("<") || rawText.includes("<!DOCTYPE html>") || rawText.toLocaleLowerCase().includes("the page");
-        const cleanMsg = isHtml 
-          ? "The application server was temporarily reloading or restarting. Please click 'Create Story' again to formulate your narrative."
-          : rawText || `Server error (${response.status})`;
-        throw { message: cleanMsg, isRateLimit: response.status === 429 };
+      if (!storyRes.ok) {
+        const errorJson = await storyRes.json().catch(() => ({}));
+        throw new Error(errorJson.error || `Story generation failed with status: ${storyRes.status}`);
       }
 
-      if (!response.ok) {
-        const isRate = response.status === 429 || String(data.details || "").includes("429") || String(data.error || "").toLowerCase().includes("limit");
-        throw { message: data.error || "Request failed", details: data.details || "", isRateLimit: isRate };
-      }
+      const storyData: StoryResult = await storyRes.json();
+      
+      // Seed initial result with no cover image URL yet
+      setStory(storyData);
+      setIsGenerating(false);
 
-      const result: StoryResult = {
-        ...data,
-        images: {}
-      };
-
-      setStoryResult(result);
-
-      // If "includeIllustrations" is checked, kick off sequential image generation!
-      if (formData.includeIllustrations) {
-        triggerSequentialIllustrations(result);
-      }
-
-    } catch (err: any) {
-      console.error(err);
-      setGenerationError({
-        message: err.message || "We could not construct the narrative right now. Please try again.",
-        details: err.details || "",
-        isRateLimit: err.isRateLimit || false
-      });
-    } finally {
-      setIsGeneratingStory(false);
-    }
-  };
-
-  // Sequential Illustration Trigger loop to absorb rate spikes and minimize parallel requests
-  const triggerSequentialIllustrations = async (storyObj: StoryResult) => {
-    const prompts = storyObj.suggestedIllustrations || [];
-    
-    for (let i = 0; i < prompts.length; i++) {
-      const markerIdx = i + 1;
-      const promptText = prompts[i];
-      if (!promptText) continue;
-
-      // Set image i to loading
-      setGeneratingImages(prev => ({ ...prev, [markerIdx]: true }));
-      setImageErrors(prev => ({ ...prev, [markerIdx]: "" }));
-
+      // Step B: Generate front cover image sequentially
       try {
-        const imageRes = await fetchWithRetry(`/api/generate-image?cb=${Date.now()}`, {
+        const imageRes = await fetch("/api/generate-image", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            illustrationDescription: promptText,
-            characterAppearance: storyObj.characterAppearance,
-            objectAppearance: storyObj.objectAppearance,
-            referencePhoto: formData.referencePhoto
+            coverIllustrationPrompt: storyData.coverIllustrationPrompt,
+            characterAppearance: storyData.characterAppearance,
           })
         });
 
-        let imageData: any;
-        const imgContentType = imageRes.headers.get("content-type") || "";
-        if (imgContentType.includes("application/json")) {
-          imageData = await imageRes.json();
+        if (imageRes.ok) {
+          const imageData = await imageRes.json();
+          setStory(prev => prev ? { ...prev, coverImageUrl: imageData.imageUrl } : null);
         } else {
-          const imgText = await imageRes.text();
-          const isHtml = imgText.trim().startsWith("<") || imgText.includes("<!DOCTYPE html>") || imgText.toLocaleLowerCase().includes("the page");
-          const cleanMsg = isHtml 
-            ? "The narrative engine is temporarily reloading."
-            : imgText || `Server error (${imageRes.status})`;
-          throw new Error(cleanMsg);
+          console.warn("Cover image returned error code. Proceeding with beautiful text-based front cover frame.");
         }
-
-        if (!imageRes.ok) {
-          const isRate = imageRes.status === 429 || String(imageData.details || "").includes("429");
-          throw new Error(
-            isRate 
-              ? "Gemini API limits reached. You can trigger this spot manually anytime with 'Try again'." 
-              : imageData.error || "Failed to render illustration space."
-          );
-        }
-
-        if (imageData.imageUrl) {
-          setStoryResult(prev => {
-            if (!prev) return null;
-            return {
-              ...prev,
-              images: {
-                ...(prev.images || {}),
-                [markerIdx]: imageData.imageUrl
-              }
-            };
-          });
-        }
-      } catch (err: any) {
-        console.error(`Error loading image index ${markerIdx}:`, err);
-        setImageErrors(prev => ({ ...prev, [markerIdx]: err.message || "Transient rate limit." }));
+      } catch (imgErr) {
+        console.error("Cover image generation crashed:", imgErr);
       } finally {
-        setGeneratingImages(prev => ({ ...prev, [markerIdx]: false }));
+        setCoverImageLoading(false);
       }
 
-      // Add a slight gentle delay between sequential requests
-      await new Promise(resolve => setTimeout(resolve, 800));
-    }
-  };
-
-  // Manual generation trigger for a single failed/skipped spot
-  const handleSingleIllustrationRegen = async (markerIdx: number) => {
-    if (!storyResult) return;
-    const promptText = storyResult.suggestedIllustrations[markerIdx - 1];
-    if (!promptText) return;
-
-    setGeneratingImages(prev => ({ ...prev, [markerIdx]: true }));
-    setImageErrors(prev => ({ ...prev, [markerIdx]: "" }));
-
-    try {
-      const imageRes = await fetchWithRetry(`/api/generate-image?cb=${Date.now()}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          illustrationDescription: promptText,
-          characterAppearance: storyResult.characterAppearance,
-          objectAppearance: storyResult.objectAppearance,
-          referencePhoto: formData.referencePhoto
-        })
-      });
-
-      let imageData: any;
-      const imgContentType = imageRes.headers.get("content-type") || "";
-      if (imgContentType.includes("application/json")) {
-        imageData = await imageRes.json();
-      } else {
-        const imgText = await imageRes.text();
-        const isHtml = imgText.trim().startsWith("<") || imgText.includes("<!DOCTYPE html>") || imgText.toLocaleLowerCase().includes("the page");
-        const cleanMsg = isHtml 
-          ? "The server was temporarily reloading. Please click try again."
-          : imgText || `Server error (${imageRes.status})`;
-        throw new Error(cleanMsg);
-      }
-
-      if (!imageRes.ok) {
-        throw new Error(imageData.error || "Illustration request failed.");
-      }
-
-      if (imageData.imageUrl) {
-        setStoryResult(prev => {
-          if (!prev) return null;
-          return {
-            ...prev,
-            images: {
-              ...(prev.images || {}),
-              [markerIdx]: imageData.imageUrl
-            }
-          };
-        });
-      }
     } catch (err: any) {
       console.error(err);
-      setImageErrors(prev => ({ ...prev, [markerIdx]: err.message || "Failed to generate dynamic artwork." }));
-    } finally {
-      setGeneratingImages(prev => ({ ...prev, [markerIdx]: false }));
+      setErrorState({
+        message: err.message || "The story creation encounter a little quiet spot.",
+        details: "Check that your GEMINI_API_KEY is configured in Settings > Secrets or try again shortly."
+      });
+      setIsGenerating(false);
+      setCoverImageLoading(false);
     }
   };
 
-  // 4. Custom Parser - return clean text without illustrations as they have been removed per user request
-  const renderFormattedLine = (lineText: string) => {
-    // Strip Web speech vocal directive tags (e.g. [calm], [warm], [soft pause Ns]) from onscreen text
-    const cleanDisplay = lineText.replace(/\[([^\]]+)\]/g, (match, tag) => {
-      if (tag.toUpperCase().startsWith("IMAGE_")) {
-        return match;
-      }
-      return "";
-    }).replace(/\s+/g, " ").trim();
-
-    // Simple robust markdown parser for **bold** and *italic*
-    const parts = cleanDisplay.split(/(\*\*.*?\*\*|\*.*?\*)/g);
-    return parts.map((part, idx) => {
-      if (part.startsWith("**") && part.endsWith("**")) {
-        return <strong key={idx} className="font-bold text-slate-800">{part.slice(2, -2)}</strong>;
-      }
-      if (part.startsWith("*") && part.endsWith("*")) {
-        return <em key={idx} className="italic text-slate-700">{part.slice(1, -1)}</em>;
-      }
-      return part;
-    });
+  // Parse text pages by the '---' line splitter
+  const getStoryPages = () => {
+    if (!story) return [];
+    // Split by '---' on its own line
+    return story.content
+      .split(/\n---\s*\n|\n---\n|---/)
+      .map(p => p.trim())
+      .filter(p => p.length > 0);
   };
 
-  const parseAndRenderContentMarkup = (story: StoryResult) => {
-    const rawContent = story.content;
-    const lines = rawContent.split("\n");
-
-    return lines.map((line, index) => {
-      const cleaned = line.trim();
-      if (!cleaned) return null;
-
-      // Check for tag match like [IMAGE_1] and skip rendering placeholders
-      const match = cleaned.match(/^\[IMAGE_(\d+)\]$/);
-      if (match) {
-        return null;
-      }
-
-      // Normal markdown text lines format
-      return (
-        <div key={`story-para-${index}`} className="my-4 font-sans text-sm sm:text-base text-slate-700 leading-relaxed">
-          {renderFormattedLine(cleaned)}
-        </div>
-      );
-    });
-  };
-
-
+  const pages = getStoryPages();
+  const totalBookPages = pages.length + 1; // + 1 for Front Cover
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start" id="create-story-container">
+    <div className="max-w-6xl mx-auto py-2 font-sans" id="create-tale-viewport">
       
-      {/* LEFT BLOCK: Sectioned Creator Form (Takes 5 cols) */}
-      <div className="lg:col-span-5 space-y-6">
-        <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-xs space-y-4">
-          <div className="space-y-1">
-            <h2 className="text-xl font-medium text-slate-800 font-sans flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-sky-500 fill-sky-200" />
-              Configure the Story
-            </h2>
-            <p className="text-xs text-slate-400 font-sans">
-              Provide your child’s preferences. We mold the pacing and language beautifully.
-            </p>
-          </div>
+      {/* Visual Page Header: Cozy children book banner */}
+      <div className="text-center mb-10 max-w-2xl mx-auto px-4" id="intro-cozy-container">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200/50 mb-3">
+          <BookOpen className="h-3 w-3" /> Warm Custom Studio
+        </span>
+        <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-amber-900 font-display mb-3">
+          Settle Down with a Cozy Custom Tale
+        </h1>
+        <p className="text-amber-800/80 text-sm md:text-base leading-relaxed">
+          Craft a low-stimulus, comforting adventure celebrating your child's passions, structured with soothing pacing and a happy, logical resolution.
+        </p>
+      </div>
 
-          {/* Stepper selection tabs */}
-          <div className="flex gap-2 border-b border-slate-100 pb-2">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start px-2">
+        
+        {/* LEFT COLUMN: Generation Form (span 5) */}
+        <div className="lg:col-span-5 bg-[#FAF6F0] border border-[#E9DFD0] rounded-3xl p-6 shadow-sm relative overflow-hidden" id="story-form-block">
+          
+          {/* Subtle wood-grain frame background effect */}
+          <div className="absolute top-0 left-0 right-0 h-2 bg-amber-700/80" />
+
+          <h2 className="text-xl font-bold font-display text-amber-900 mb-6 flex items-center justify-between">
+            <span>📚 Story Book Builder</span>
+            <span className="text-xs text-amber-600/70 font-sans font-normal">Page-by-page personalized</span>
+          </h2>
+
+          {/* Form Step Badges */}
+          <div className="flex bg-amber-100/50 rounded-2xl p-1 mb-6 text-xs font-semibold text-amber-800">
             <button
               onClick={() => setActiveFormStep("profile")}
-              className={`cursor-pointer px-3 py-1.5 rounded-lg text-xs font-semibold ${
-                activeFormStep === "profile" 
-                  ? "bg-sky-50 text-sky-700" 
-                  : "text-slate-400 hover:text-slate-600"
+              className={`flex-1 py-2 text-center rounded-xl transition-all cursor-pointer ${
+                activeFormStep === "profile" ? "bg-white text-amber-950 font-bold shadow-xs" : "hover:text-amber-950"
               }`}
             >
-              1. Child Profile
+              1. Child's Profile
             </button>
             <button
-              onClick={() => setActiveFormStep("comfort")}
-              className={`cursor-pointer px-3 py-1.5 rounded-lg text-xs font-semibold ${
-                activeFormStep === "comfort" 
-                  ? "bg-sky-50 text-sky-700" 
-                  : "text-slate-400 hover:text-slate-600"
+              onClick={() => setActiveFormStep("pacing")}
+              className={`flex-1 py-2 text-center rounded-xl transition-all cursor-pointer ${
+                activeFormStep === "pacing" ? "bg-white text-amber-950 font-bold shadow-xs" : "hover:text-amber-950"
               }`}
             >
-              2. Comfort & Anchors
+              2. Passions & Support
             </button>
             <button
-              onClick={() => setActiveFormStep("format")}
-              className={`cursor-pointer px-3 py-1.5 rounded-lg text-xs font-semibold ${
-                activeFormStep === "format" 
-                  ? "bg-sky-50 text-sky-700" 
-                  : "text-slate-400 hover:text-slate-600"
+              onClick={() => setActiveFormStep("theme")}
+              className={`flex-1 py-2 text-center rounded-xl transition-all cursor-pointer ${
+                activeFormStep === "theme" ? "bg-white text-amber-950 font-bold shadow-xs" : "hover:text-amber-950"
               }`}
             >
-              3. Length & Vibe
+              3. Vibe & Reading
             </button>
           </div>
 
-          <form onSubmit={handleGenerateStory} className="space-y-5 pt-2">
-            {/* STEP 1: profile info */}
+          <form onSubmit={generatePersonalizedStory} className="space-y-6">
+            
+            {/* Step 1: Child's Profile content */}
             {activeFormStep === "profile" && (
               <motion.div 
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="space-y-4"
+                className="space-y-5"
               >
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1" htmlFor="child-name">
-                    Child's Name *
+                  <label className="block text-xs font-bold text-amber-900 uppercase tracking-widest mb-1.5" htmlFor="child-name">
+                    Child's First Name
                   </label>
                   <div className="relative">
-                    <User className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
                     <input
                       id="child-name"
                       type="text"
-                      className="w-full pl-10 pr-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-sky-500 bg-slate-50/50"
-                      placeholder="e.g. Leo, Maya, Christopher"
+                      className="w-full bg-white border border-[#E0D4C3] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600 text-amber-900 font-medium placeholder-amber-700/30"
+                      placeholder="e.g. Leo, Alice, Danny"
                       value={formData.name}
-                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                      onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
                       required
                     />
+                    <User className="absolute right-3.5 top-3.5 h-4 w-4 text-[#C5B49D]" />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1" htmlFor="child-age">
-                      Age (Optional)
+                    <label className="block text-xs font-bold text-amber-900 uppercase tracking-widest mb-1.5" htmlFor="child-age">
+                      Age (for vocabulary)
                     </label>
                     <input
                       id="child-age"
-                      type="text"
-                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none bg-slate-50/50"
-                      placeholder="e.g. 7"
+                      type="number"
+                      min="2"
+                      max="16"
+                      className="w-full bg-white border border-[#E0D4C3] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600 text-amber-900"
                       value={formData.age}
-                      onChange={(e) => setFormData(prev => ({ ...prev, age: e.target.value }))}
+                      onChange={e => setFormData(prev => ({ ...prev, age: e.target.value }))}
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1" htmlFor="child-pronouns">
+                    <label className="block text-xs font-bold text-amber-900 uppercase tracking-widest mb-1.5" htmlFor="child-pronouns">
                       Pronouns
                     </label>
-                    <input
+                    <select
                       id="child-pronouns"
-                      type="text"
-                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none bg-slate-50/50"
-                      placeholder="e.g. he/him, she/her"
+                      className="w-full bg-white border border-[#E0D4C3] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600 text-amber-900"
                       value={formData.pronouns}
-                      onChange={(e) => setFormData(prev => ({ ...prev, pronouns: e.target.value }))}
-                    />
+                      onChange={e => setFormData(prev => ({ ...prev, pronouns: e.target.value }))}
+                    >
+                      <option value="he/him">He / Him</option>
+                      <option value="she/her">She / Her</option>
+                      <option value="they/them">They / Them</option>
+                    </select>
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-slate-150/60">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const nextState = !showCompanionForm;
-                      setShowCompanionForm(nextState);
-                      if (!nextState) {
-                        setFormData(prev => ({
-                          ...prev,
-                          companionName: "",
-                          companionType: "friend",
-                          companionAppearance: ""
-                        }));
-                      }
-                    }}
-                    className={`cursor-pointer w-full flex items-center justify-between p-3 rounded-xl border text-xs font-semibold transition ${
-                      showCompanionForm 
-                        ? "bg-sky-50 border-sky-200 text-sky-850" 
-                        : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600"
-                    }`}
-                  >
-                    <span className="flex items-center gap-2">
-                      <Users className="h-4 w-4" />
-                      Add another character (Companion)
-                    </span>
-                    <span className="text-[10px] font-bold text-sky-600 bg-sky-100/60 px-2 py-0.5 rounded-full">
-                      {showCompanionForm ? "Active" : "Optional"}
-                    </span>
-                  </button>
-
-                  <AnimatePresence>
-                    {showCompanionForm && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="overflow-hidden mt-3 space-y-3 pl-1 border-l-2 border-sky-100"
-                      >
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1" htmlFor="companion-name">
-                              Companion’s Name *
-                            </label>
-                            <input
-                              id="companion-name"
-                              type="text"
-                              className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none bg-white"
-                              placeholder="e.g. Oliver, Sparky"
-                              value={formData.companionName || ""}
-                              onChange={(e) => setFormData(prev => ({ ...prev, companionName: e.target.value }))}
-                              required={showCompanionForm}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1" htmlFor="companion-role">
-                              Relation / Type
-                            </label>
-                            <select
-                              id="companion-role"
-                              className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none bg-white cursor-pointer"
-                              value={formData.companionType || "friend"}
-                              onChange={(e) => setFormData(prev => ({ ...prev, companionType: e.target.value }))}
-                            >
-                              <option value="friend">Friend / Playmate</option>
-                              <option value="sibling">Sibling (Brother / Sister)</option>
-                              <option value="cousin">Cousin</option>
-                              <option value="nephew">Nephew / Niece</option>
-                              <option value="pet">Pet (Dog, Cat, etc.)</option>
-                              <option value="robot">Helpful Robot</option>
-                              <option value="creature">Friendly Creature</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1" htmlFor="companion-appearance">
-                            Physical Appearance (Optional)
-                          </label>
-                          <input
-                            id="companion-appearance"
-                            type="text"
-                            className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none bg-white"
-                            placeholder="e.g. wears soft green boots, carries a red backpack, has floppy ears"
-                            value={formData.companionAppearance || ""}
-                            onChange={(e) => setFormData(prev => ({ ...prev, companionAppearance: e.target.value }))}
-                          />
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                <div>
+                  <label className="block text-xs font-bold text-amber-900 uppercase tracking-widest mb-1.5" htmlFor="child-phys-desc">
+                    Appearance Details (Friendly Comfort)
+                  </label>
+                  <textarea
+                    id="child-phys-desc"
+                    rows={2}
+                    className="w-full bg-white border border-[#E0D4C3] rounded-2xl px-4 py-3 text-xs focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600 text-amber-900 placeholder-amber-700/40"
+                    placeholder="e.g., green overalls, yellow cap, friendly smile, big glasses (Helps generate matching cover image!)"
+                    value={formData.customAppearance}
+                    onChange={e => setFormData(prev => ({ ...prev, customAppearance: e.target.value }))}
+                  />
                 </div>
 
-                <div className="pt-4 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setActiveFormStep("comfort")}
-                    className="inline-flex items-center gap-1 text-xs font-bold text-sky-600"
-                  >
-                    Adjust Comfort Settings <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveFormStep("pacing")}
+                  className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm py-3 px-4 rounded-xl cursor-pointer flex items-center justify-center gap-1.5 shadow-sm active:scale-98 transition duration-150 mt-2"
+                >
+                  Next Step: Passions <ChevronRight className="h-4 w-4" />
+                </button>
               </motion.div>
             )}
 
-            {/* STEP 2: Interests, triggers, and anchors */}
-            {activeFormStep === "comfort" && (
+            {/* Step 2: Passions & Support content */}
+            {activeFormStep === "pacing" && (
               <motion.div 
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="space-y-4"
+                className="space-y-5"
               >
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-slate-600" htmlFor="special-interests">
-                      Special Interests / Deep Focus *
-                    </label>
-                    <span className="text-[10px] text-sky-600 font-semibold uppercase tracking-wider">anchors safety</span>
-                  </div>
+                  <label className="block text-xs font-bold text-amber-900 uppercase tracking-widest mb-1" htmlFor="child-interests">
+                    Special Interests & Passions (Crucial ⭐)
+                  </label>
+                  <span className="block text-[11px] text-amber-800/60 mb-2 leading-relaxed font-sans">
+                    Weave their deep interest (e.g. steam trains, pocket watches, bird-watching, solar systems) directly into the story as a celebrated talent!
+                  </span>
                   <textarea
-                    id="special-interests"
+                    id="child-interests"
                     rows={2}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-sky-500 bg-slate-50/50"
-                    placeholder="e.g. steam train engine models, star coordinates, blue marbles, geometric puzzles"
+                    className="w-full bg-white border border-[#E0D4C3] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600 text-amber-900 placeholder-amber-700/30"
+                    placeholder="e.g., steam trains, sorting marbles by color, old maps, mechanical gears"
                     value={formData.specialInterests}
-                    onChange={(e) => setFormData(prev => ({ ...prev, specialInterests: e.target.value }))}
+                    onChange={e => setFormData(prev => ({ ...prev, specialInterests: e.target.value }))}
                     required
                   />
-                  
-                  {/* Small suggestions chips */}
-                  <div className="mt-2 flex flex-wrap gap-1.5 items-center">
-                    <span className="text-[10px] text-slate-400">Examples:</span>
-                    <button 
-                      type="button" 
-                      onClick={() => fillSampleInterest("vintage steam train tracks and timetables", "sudden changes, loud whistles")}
-                      className="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-0.5 rounded transition"
-                    >
-                      Trains
-                    </button>
-                    <button 
-                      type="button" 
-                      onClick={() => fillSampleInterest("telescope star alignments and Orion Belt", "bright flashing strobe lights")}
-                      className="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-0.5 rounded transition"
-                    >
-                      Star mapping
-                    </button>
-                    <button 
-                      type="button" 
-                      onClick={() => fillSampleInterest("sorting blocks by exact count & color values", "crowded loud halls")}
-                      className="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-0.5 rounded transition"
-                    >
-                      Sorting blocks
-                    </button>
-                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1" htmlFor="sensory-triggers">
-                    Sensory triggers or dislikes to avoid/manage
+                  <label className="block text-xs font-bold text-amber-900 uppercase tracking-widest mb-1.5" htmlFor="child-triggers">
+                    Sensory Preferences or Potential Triggers
                   </label>
                   <input
-                    id="sensory-triggers"
+                    id="child-triggers"
                     type="text"
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none bg-slate-50/50"
-                    placeholder="e.g. loud high whistles, flashing lights, sudden changes"
+                    className="w-full bg-white border border-[#E0D4C3] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600 text-amber-900 placeholder-amber-700/30"
+                    placeholder="e.g., sudden loud siren noises, large busy crowds, flashing lights"
                     value={formData.triggers}
-                    onChange={(e) => setFormData(prev => ({ ...prev, triggers: e.target.value }))}
+                    onChange={e => setFormData(prev => ({ ...prev, triggers: e.target.value }))}
                   />
                 </div>
 
-                {/* Gently check / address triggers */}
-                <div className="flex items-start gap-2.5 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                  <input
-                    id="gently-address"
-                    type="checkbox"
-                    className="mt-1 h-3.5 w-3.5 rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer"
-                    checked={formData.addressTriggers}
-                    onChange={(e) => setFormData(prev => ({ ...prev, addressTriggers: e.target.checked }))}
-                  />
-                  <div className="space-y-0.5">
-                    <label htmlFor="gently-address" className="text-xs font-semibold text-slate-700 cursor-pointer">
-                      Gently reference and soothe triggers
+                <div className="bg-amber-100/30 border border-amber-200/50 rounded-2xl p-3.5 space-y-2.5">
+                  <div className="flex items-start gap-2.5">
+                    <input
+                      id="address-triggers"
+                      type="checkbox"
+                      className="cursor-pointer h-4 w-4 rounded-sm text-amber-600 focus:ring-amber-500 border-amber-300 mt-0.5"
+                      checked={formData.addressTriggers}
+                      onChange={e => setFormData(prev => ({ ...prev, addressTriggers: e.target.checked }))}
+                    />
+                    <label htmlFor="address-triggers" className="text-xs text-amber-900 font-sans cursor-pointer leading-tight">
+                      <strong>Reassuring Trigger Practice</strong>
+                      <span className="block text-amber-800/70 text-[10.5px] mt-0.5">
+                        Instead of omitting, gently address the trigger in the story, demonstrating how it can be safely and peacefully resolved in a Quiet, low-sensory environment.
+                      </span>
                     </label>
-                    <p className="text-[10px] text-slate-400 font-sans leading-relaxed">
-                      If checked, we safely address them in a peaceful situation to reassure the child. If unchecked, the triggers are omitted completely.
-                    </p>
                   </div>
                 </div>
 
-                <div className="pt-2 flex justify-between">
-                  <button
-                    type="button"
-                    onClick={() => setActiveFormStep("profile")}
-                    className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600"
-                  >
-                    &larr; Back
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveFormStep("format")}
-                    className="inline-flex items-center gap-1 text-xs font-bold text-sky-600"
-                  >
-                    Format & Output <ChevronRight className="h-4 w-4" />
-                  </button>
+                {/* Quick Presets row */}
+                <div className="pt-1">
+                  <span className="block text-[10px] uppercase tracking-widest text-[#9C6B43] font-bold mb-2">💡 Quick Inspo Presets</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleQuickPreset("steam locomotives with exact wheels count", "loud whistling whistles")}
+                      className="cursor-pointer bg-[#F5EBE1] hover:bg-[#EBDCCF] text-[#6E421E] px-2.5 py-1 rounded-lg text-xs font-medium border border-amber-250/20"
+                    >
+                      Steam Trains 🚂
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickPreset("cozy mechanical pocket watches ticking", "crowded buzzing schoolrooms")}
+                      className="cursor-pointer bg-[#F5EBE1] hover:bg-[#EBDCCF] text-[#6E421E] px-2.5 py-1 rounded-lg text-xs font-medium border border-amber-250/20"
+                    >
+                      Pocket Clocks 🕰️
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickPreset("sorting beach seashells by spiral patterns", "unexpected visual flashes")}
+                      className="cursor-pointer bg-[#F5EBE1] hover:bg-[#EBDCCF] text-[#6E421E] px-2.5 py-1 rounded-lg text-xs font-medium border border-amber-250/20"
+                    >
+                      Beach Shells 🐚
+                    </button>
+                  </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveFormStep("theme")}
+                  className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm py-3 px-4 rounded-xl cursor-pointer flex items-center justify-center gap-1.5 shadow-sm active:scale-98 transition duration-150"
+                >
+                  Next: Pacing & Length <ChevronRight className="h-4 w-4" />
+                </button>
               </motion.div>
             )}
 
-            {/* STEP 3: Format preferences, include Illustrations */}
-            {activeFormStep === "format" && (
+            {/* Step 3: Vibe & Reading content */}
+            {activeFormStep === "theme" && (
               <motion.div 
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 className="space-y-4"
               >
-                <div className="grid grid-cols-2 gap-3 pb-1">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1" htmlFor="select-length">
+                    <label className="block text-xs font-bold text-amber-900 uppercase tracking-widest mb-1.5" htmlFor="book-length">
                       Length
                     </label>
                     <select
-                      id="select-length"
-                      className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg p-2 focus:outline-none"
+                      id="book-length"
+                      className="w-full bg-white border border-[#E0D4C3] rounded-2xl px-3 py-2.5 text-xs focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600 text-amber-900"
                       value={formData.length}
-                      onChange={(e: any) => setFormData(prev => ({ ...prev, length: e.target.value }))}
+                      onChange={e => setFormData(prev => ({ ...prev, length: e.target.value as any }))}
                     >
-                      <option value="Short">Short (~300w)</option>
-                      <option value="Medium">Medium (~550w)</option>
-                      <option value="Long">Long (~900w)</option>
+                      <option value="Short">Short (~2-3 pages)</option>
+                      <option value="Medium">Medium (~3-5 pages)</option>
+                      <option value="Long">Long (~4-6 pages)</option>
                     </select>
                   </div>
-
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1" htmlFor="select-perspective">
+                    <label className="block text-xs font-bold text-amber-900 uppercase tracking-widest mb-1.5" htmlFor="book-perspective">
                       Perspective
                     </label>
                     <select
-                      id="select-perspective"
-                      className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg p-2 focus:outline-none"
+                      id="book-perspective"
+                      className="w-full bg-white border border-[#E0D4C3] rounded-2xl px-3 py-2.5 text-xs focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600 text-amber-900"
                       value={formData.perspective}
-                      onChange={(e: any) => setFormData(prev => ({ ...prev, perspective: e.target.value }))}
+                      onChange={e => setFormData(prev => ({ ...prev, perspective: e.target.value as any }))}
                     >
-                      <option value="Third-person">Third person (Leo did)</option>
-                      <option value="First-person">First person (I did)</option>
+                      <option value="Third-person">Third-Person ("Leo felt...")</option>
+                      <option value="First-person">First-Person ("I felt...")</option>
                     </select>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1" htmlFor="select-sensory">
-                    Sensory Pacing & Pattern style
+                  <label className="block text-xs font-bold text-amber-900 uppercase tracking-widest mb-1.5" htmlFor="sensory-pacing">
+                    Sensory Level & Sound Pacing
                   </label>
                   <select
-                    id="select-sensory"
-                    className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg p-2 focus:outline-none"
+                    id="sensory-pacing"
+                    className="w-full bg-white border border-[#E0D4C3] rounded-2xl px-3 py-3 text-xs focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600 text-amber-900"
                     value={formData.sensoryLevel}
-                    onChange={(e: any) => setFormData(prev => ({ ...prev, sensoryLevel: e.target.value }))}
+                    onChange={e => setFormData(prev => ({ ...prev, sensoryLevel: e.target.value }))}
                   >
-                    <option value="Low sensory, reassuring and repetitive">Low sensory, high repetition</option>
-                    <option value="Steady pacing with structured transitions">Steady structured pacing</option>
-                    <option value="Rich details, spatial numbers and systems">High-detail coordinate orientation</option>
+                    <option value="Low sensory, reassuring and repetitive">Low-stimulation, calm repetition & predictable patterns</option>
+                    <option value="Extremely quiet, slow tempo descriptive">Extremely quiet, focus on micro-details & soft environments</option>
+                    <option value="Mild interest-led adventure">Mildly interactive, exploring focus passions happily</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1" htmlFor="select-structure">
-                    Story Structure / Environment
+                  <label className="block text-xs font-bold text-amber-900 uppercase tracking-widest mb-1.5" htmlFor="story-resolve">
+                    Story Structure / Calm Flow
                   </label>
                   <select
-                    id="select-structure"
-                    className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg p-2 focus:outline-none"
+                    id="story-resolve"
+                    className="w-full bg-white border border-[#E0D4C3] rounded-2xl px-3 py-3 text-xs focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600 text-amber-900"
                     value={formData.structure}
-                    onChange={(e: any) => setFormData(prev => ({ ...prev, structure: e.target.value }))}
+                    onChange={e => setFormData(prev => ({ ...prev, structure: e.target.value }))}
                   >
-                    <option value="Calming bedtime story with orderly resolution">Bedtime (Calming & soothing sleep)</option>
-                    <option value="Orderly safety patrol with friendly helpers">Quiet patrol / Help friends</option>
-                    <option value="Nature discovery under peaceful schedules">Nature Discovery schedules</option>
+                    <option value="Calming bedtime story with orderly resolution">Soft winding-down bedtime story for deep peace</option>
+                    <option value="Structured sensory routine helper with happy closure">Sensory logic routine builder with familiar steps</option>
+                    <option value="Warm discovery tale showcasing detail-attention skill">Discovery tale showcasing sensory-detail strengths</option>
                   </select>
                 </div>
 
-                <div className="pt-2 flex justify-between">
+                {/* Confirm banner: Single cover image reminder */}
+                <div className="bg-amber-100/30 border border-amber-200/40 rounded-2xl p-3 text-[10.5px] text-amber-900 leading-normal flex items-start gap-2">
+                  <Bookmark className="h-4.5 w-4.5 text-amber-600 mt-0.5 shrink-0" />
+                  <p className="font-sans">
+                    <strong>Front Cover Illustration only:</strong> This book creates one beautiful front cover illustration matching your child's specifics. No chaotic inner-page images to prevent cognitive visual inconsistency.
+                  </p>
+                </div>
+
+                <div className="pt-2 flex gap-3">
                   <button
                     type="button"
-                    onClick={() => setActiveFormStep("comfort")}
-                    className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600"
+                    onClick={() => setActiveFormStep("pacing")}
+                    className="flex-1 bg-amber-50 cursor-pointer text-amber-900 font-bold border border-amber-250/20 py-3 rounded-xl hover:bg-amber-100/60 font-sans text-xs transition active:scale-98"
                   >
-                    &larr; Back
+                    Go Back
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-[2] bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm py-3 px-4 rounded-xl cursor-pointer flex items-center justify-center gap-1.5 shadow-md active:scale-98 transition duration-150"
+                  >
+                    <Sparkles className="h-4 w-4 fill-white" /> Create Cozy Story!
                   </button>
                 </div>
               </motion.div>
             )}
 
-            {/* TRIGGER CREATOR ACTION PANEL */}
-            <div className="pt-4 border-t border-slate-100">
+          </form>
+          
+          {/* Wooden desk drawer accent line */}
+          <div className="mt-8 pt-4 border-t border-amber-900/10 text-center">
+            <span className="text-[11px] text-[#A58E71] font-serif italic">Every story is written using server-secure, fully personalized intelligence.</span>
+          </div>
+
+        </div>
+
+        {/* RIGHT COLUMN: Interactive Cozy Reader & Bookshelf (span 7) */}
+        <div className="lg:col-span-7 flex flex-col gap-8" id="comfort-display-frame">
+          
+          {/* 1. Loading State */}
+          {isGenerating && (
+            <div className="bg-[#FAF6F0] border border-[#E9DFD0] rounded-3xl p-12 text-center shadow-xs flex flex-col items-center justify-center" id="generator-loader">
+              <div className="relative mb-6">
+                {/* Glowing cozy campfire animation */}
+                <div className="h-16 w-16 bg-amber-100 rounded-full flex items-center justify-center animate-pulse">
+                  <Sparkle className="h-8 w-8 text-amber-600 fill-amber-500 animate-spin-slow" />
+                </div>
+                <div className="absolute top-1 left-2 h-2 w-2 rounded-full bg-orange-400 animate-ping" />
+              </div>
+              <h3 className="text-xl font-bold font-display text-amber-900 mb-2">
+                Weaving Warm Thoughts...
+              </h3>
+              <p className="text-amber-700/80 text-sm max-w-sm font-serif italic">
+                "{loadingMessages[loadingMessageIdx]}"
+              </p>
+              <div className="w-48 bg-amber-100/60 rounded-full h-1.5 mt-6 overflow-hidden">
+                <div className="bg-amber-600 h-full animate-loader rounded-full" />
+              </div>
+            </div>
+          )}
+
+          {/* 2. Error Panel */}
+          {errorState && !isGenerating && (
+            <div className="bg-red-50/50 border border-red-200 rounded-3xl p-6 text-center" id="generator-error">
+              <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-3" />
+              <h3 className="text-md font-bold text-red-950 mb-1">Could Not Connect To Storyteller</h3>
+              <p className="text-red-900/80 text-xs mb-3 max-w-md mx-auto">{errorState.message}</p>
+              {errorState.details && (
+                <div className="bg-white/80 p-3 rounded-2xl text-[10px] text-red-950/80 font-mono mb-4 text-left border border-red-100 max-h-24 overflow-y-auto">
+                  {errorState.details}
+                </div>
+              )}
               <button
-                type="submit"
-                disabled={isGeneratingStory}
-                className="cursor-pointer w-full inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-medium py-3 text-xs sm:text-sm shadow-sm transition active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
-                id="btn-trigger-generation"
+                onClick={() => setErrorState(null)}
+                className="cursor-pointer bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs py-2 px-4 rounded-xl active:scale-95 transition"
               >
-                {isGeneratingStory ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Writing customized tale...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4" />
-                    Create Story
-                  </>
-                )}
+                Clear Notice
               </button>
             </div>
-          </form>
-        </div>
+          )}
 
-        {/* Your Saved Tales (Library) */}
-        {favorites.length > 0 && (
-          <div className="bg-white rounded-3xl border border-slate-100 p-5 space-y-3 shadow-xs">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-              <BookOpen className="h-3.5 w-3.5 text-sky-500" />
-              Your Comfort Library ({favorites.length})
-            </h3>
-            <p className="text-[11px] text-slate-400 leading-normal font-sans">
-              Autistic children thrive on repetition. These saved stories preserve the exact imagery and comforting text for perfect predictability.
-            </p>
-            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-              {favorites.map((fav, idx) => (
-                <div 
-                  key={idx} 
-                  className="group flex items-center justify-between p-2.5 rounded-xl border border-slate-50 hover:border-sky-100 hover:bg-sky-50/20 transition text-left"
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStoryResult(fav);
-                      // Pre-populate child's name
-                      if (fav.title) {
-                        const namePart = fav.title.split(" ")[0];
-                        if (namePart && namePart.length > 1) {
-                          setFormData(prev => ({ ...prev, name: namePart }));
-                        }
-                      }
-                    }}
-                    className="flex-1 text-left cursor-pointer pr-2"
-                  >
-                    <div className="text-xs font-semibold text-slate-700 font-sans group-hover:text-sky-700 transition line-clamp-1">
-                      {fav.title}
-                    </div>
-                    <div className="text-[10px] text-slate-400 mt-0.5 font-mono truncate">
-                      ⭐ {fav.keyFeatures.specialInterestUsed}
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const updated = favorites.filter((_, i) => i !== idx);
-                      setFavorites(updated);
-                      localStorage.setItem("glowtales_library", JSON.stringify(updated));
-                    }}
-                    className="text-slate-300 hover:text-red-500 p-1 rounded-lg transition"
-                    title="Remove story"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Comforting literary note */}
-        <div className="bg-sky-50/50 rounded-2xl border border-sky-100 p-4 text-xs text-sky-900/85 font-sans leading-relaxed space-y-1">
-          <span className="font-semibold text-sky-800 flex items-center gap-1.5">
-            <Smile className="h-3.5 w-3.5 text-sky-600 fill-sky-200" />
-            Tranquil Reading Mode
-          </span>
-          <p>
-            To avoid sensory distraction and maintain absolute focus and consistency, GlowTales runs in a beautiful, pure high-typography text reader mode.
-          </p>
-        </div>
-      </div>
-
-      {/* RIGHT BLOCK: Story Preview Output (Takes 7 cols) */}
-      <div className="lg:col-span-7">
-        
-        {/* State A: Initial loading screen */}
-        {isGeneratingStory && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="bg-white rounded-3xl border border-slate-100 p-8 sm:p-14 text-center space-y-6 shadow-xs flex flex-col items-center justify-center min-h-[460px]"
-            id="story-loader-screener"
-          >
-            <div className="relative">
-              <div className="absolute inset-x-0 -top-4 mx-auto w-10 h-10 bg-sky-100 rounded-full blur-xl animate-pulse" />
-              <Loader2 className="h-10 w-10 text-sky-500 animate-spin relative" />
-            </div>
-            
-            <div className="space-y-2 max-w-sm">
-              <h3 className="text-lg font-medium text-slate-800 font-sans">Drafting sensory comfort...</h3>
-              <p className="text-xs text-slate-400 font-sans leading-relaxed">
-                Our pedatric engine is avoiding metaphors, aligning "{formData.specialInterests}" symmetrically, and ensuring the pacing remains safe and friendly.
+          {/* 3. Empty State Instructions */}
+          {!story && !isGenerating && !errorState && (
+            <div className="bg-[#FCFAF7] border border-[#EDE4D9] rounded-3xl p-10 text-center shadow-3xs flex flex-col items-center justify-center" id="empty-story-placeholder">
+              <div className="p-4 rounded-full bg-amber-50 border border-amber-100 mb-4">
+                <BookOpen className="h-8 w-8 text-[#C5965E]" />
+              </div>
+              <h3 className="text-lg font-bold font-display text-amber-950 mb-2">Your Cozy Storybook Awaits</h3>
+              <p className="text-amber-800/70 text-xs sm:text-sm max-w-md mb-6 leading-relaxed">
+                Fill out your kid's character details and special interests on the left. Press <strong className="text-amber-900">Create Cozy Story</strong> to watch a gorgeous personalized hardcover book generate right before your eyes.
               </p>
-            </div>
-
-            <div className="w-full bg-slate-100 rounded-full h-1 max-w-xs overflow-hidden">
-              <div className="bg-sky-500 h-full animate-[shimmer_1.5s_infinite]" style={{ width: "65%" }} />
-            </div>
-          </motion.div>
-        )}
-
-        {/* State B: Error boundary note */}
-        {generationError && (() => {
-          const isKeyError = (generationError.message && (
-            generationError.message.includes("GEMINI_API_KEY") || 
-            generationError.message.includes("API Key") || 
-            generationError.message.includes("API key") || 
-            generationError.message.includes("unset or set to placeholder")
-          )) || (generationError.details && (
-            generationError.details.includes("GEMINI_API_KEY") ||
-            generationError.details.includes("API Key") ||
-            generationError.details.includes("API key") ||
-            generationError.details.includes("unset")
-          ));
-
-          return (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="bg-orange-50 border border-orange-100 rounded-3xl p-6 sm:p-10 space-y-4"
-              id="story-error-screener"
-            >
-              <div className="p-3 bg-white rounded-2xl inline-block shadow-xs">
-                <AlertCircle className="h-8 w-8 text-orange-600" />
-              </div>
               
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium text-orange-950 font-sans">
-                  {isKeyError ? "Gemini Secrets Activation Required" : (generationError.isRateLimit ? "Service limits reached" : "We hit a quiet spot")}
-                </h3>
-                
-                {isKeyError ? (
-                  <div className="space-y-3">
-                    <p className="text-xs text-orange-900 font-sans leading-relaxed">
-                      You are running in the Google AI Studio cloud workspace environment. To call the Gemini models successfully from your backend, you must declare your active Gemini API key under the AI Studio secrets configuration Panel:
-                    </p>
-                    <div className="bg-white/80 border border-orange-200/60 rounded-2xl p-4 text-xs text-slate-700 font-sans space-y-2 text-left">
-                      {(window.location.hostname.includes("-pre") || window.location.hostname.includes("pre.run.app")) && (
-                        <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-950 p-4 rounded-2xl text-[11px] leading-relaxed space-y-2">
-                          <span className="font-bold text-amber-800 flex items-center gap-1.5 text-xs">
-                            ⚠️ Viewing from Shared App URL
-                          </span>
-                          <p className="text-amber-900/90 font-sans">
-                            You are currently viewing the shared production preview snapshot (<strong>-pre.run.app</strong>). Because this environment snapshot is public, it does not have access to your private, secure development secrets in Google AI Studio.
-                          </p>
-                          <p className="font-semibold text-amber-900 pl-1 font-sans">
-                            👉 Please click the button below to switch to your direct <strong>Development App URL</strong> (-dev.run.app) to use your active Gemini API key:
-                          </p>
-                          <div className="pt-1">
-                            <a 
-                              href={window.location.href.replace("-pre", "-dev")}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs transition hover:bg-amber-700 hover:text-white"
-                            >
-                              Open Live Development App 🚀
-                            </a>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="font-semibold text-orange-850 flex items-center gap-1.5 mb-1 text-xs">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-orange-100 text-[11.5px] font-bold text-orange-800">1</span>
-                        Go to Settings (Gear Icon)
-                      </div>
-                      <p className="text-[11px] text-slate-500 pl-6 leading-normal">
-                        Click the **Settings (Gear Icon)** or the panel button located on the top right / sidebar in Google AI Studio.
-                      </p>
-                      
-                      <div className="font-semibold text-orange-850 flex items-center gap-1.5 mb-1 text-xs">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-orange-100 text-[11.5px] font-bold text-orange-800">2</span>
-                        Configure GEMINI_API_KEY Secret
-                      </div>
-                      <p className="text-[11px] text-slate-500 pl-6 leading-normal">
-                        Navigate to **Secrets**, add a new Secret with the exact name <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-[10.5px]">GEMINI_API_KEY</code>, and paste your active Gemini API key or workspace token.
-                      </p>
-
-                      <div className="font-semibold text-orange-850 flex items-center gap-1.5 mb-1 text-xs">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-orange-100 text-[11.5px] font-bold text-orange-800">3</span>
-                        Restart the Dev Server / Re-run
-                      </div>
-                      <p className="text-[11px] text-slate-500 pl-6 leading-normal">
-                        Because environment variables load at process startup, you must re-run the server for changes to apply. You can trigger this easily by typing a simple text instruction like <strong className="text-slate-700">"please restart"</strong> here in the chat, which lets me instantly cycle the active dev server container!
-                      </p>
-                    </div>
+              <div className="w-full max-w-md bg-[#FAF6F0] p-4 rounded-2xl border border-[#E9DFD0]/60 text-left space-y-3">
+                <span className="text-[10px] font-bold text-[#A48261] uppercase tracking-wider block">🛡️ Built-in Sensory Guardrails:</span>
+                <div className="grid grid-cols-2 gap-2 text-[11px] text-[#715D4D]">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-amber-600 font-bold">✓</span> Highly Literal Text
                   </div>
-                ) : (
-                  <p className="text-xs text-orange-850 font-sans leading-relaxed">
-                    {generationError.isRateLimit 
-                      ? "We have momentarily hit the default sandbox Gemini API limits. Please wait a minute or connect your own API Key in Settings > Secrets to continue uninterrupted."
-                      : generationError.message}
-                  </p>
-                )}
-
-                {generationError.details && (
-                  <div className="mt-3 p-3.5 bg-orange-100/40 rounded-xl text-[11px] font-mono text-orange-950 border border-orange-200/50 leading-relaxed text-left break-words">
-                    <div className="font-bold mb-1 uppercase tracking-wider text-[10px] text-orange-800">Diagnostic Details:</div>
-                    {generationError.details}
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-amber-600 font-bold">✓</span> No Loud Screaming
                   </div>
-                )}
-              </div>
-
-              <div className="pt-2">
-                <button
-                  onClick={handleGenerateStory}
-                  disabled={isGeneratingStory}
-                  className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-orange-700 disabled:opacity-50"
-                >
-                  <RefreshCw className={`h-3 w-3 ${isGeneratingStory ? 'animate-spin' : ''}`} />
-                  {isGeneratingStory ? "Constructing narrative..." : "Retry Narrative creation"}
-                </button>
-              </div>
-            </motion.div>
-          );
-        })()}
-
-        {/* State C: Empty/Idle screen */}
-        {!isGeneratingStory && !storyResult && !generationError && (
-          <div className="border-2 border-dashed border-slate-200 rounded-3xl p-8 text-center flex flex-col items-center justify-center min-h-[460px]" id="empty-story-state">
-            <BookOpen className="h-12 w-12 text-slate-300 stroke-[1.5] mb-4" />
-            <h3 className="text-base font-medium text-slate-700 font-sans">Your custom storybook starts here</h3>
-            <p className="text-xs text-slate-400 font-sans max-w-sm mt-1.5 leading-relaxed">
-              Fill in the star's details on the left, then click <strong>Create Story</strong> to formulate a magical adventure tailored to their favorite focus system.
-            </p>
-          </div>
-        )}
-
-        {/* State D: Completed and active Story Viewer output block */}
-        {storyResult && !isGeneratingStory && !generationError && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-3xl border border-slate-100/90 p-6 sm:p-10 space-y-6 shadow-xs relative"
-            id="dynamic-storybook-viewer"
-          >
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-5 gap-3">
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-serif font-medium text-slate-800 leading-tight">
-                  {storyResult.title}
-                </h1>
-                <div className="flex items-center gap-1.5 mt-2 text-xs text-sky-600 font-semibold font-sans">
-                  <Smile className="h-3.5 w-3.5" />
-                  <span>Personalized story for {formData.name}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-amber-600 font-bold">✓</span> Detail-focused Plot
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-amber-600 font-bold">✓</span> Comforting Ending
+                  </div>
                 </div>
               </div>
-              <div className="shrink-0">
-                <button
-                  type="button"
-                  onClick={handleSaveToFavorites}
-                  className={`cursor-pointer inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold shadow-xs transition active:scale-95 border ${
-                    favorites.some(fav => fav.title === storyResult.title)
-                      ? "bg-rose-50 border-rose-100 text-rose-700"
-                      : "bg-white border-slate-100 text-slate-600 hover:bg-slate-50 hover:text-slate-800"
-                  }`}
-                >
-                  <Heart className={`h-4 w-4 ${favorites.some(fav => fav.title === storyResult.title) ? "fill-rose-500 text-rose-500" : ""}`} />
-                  {favorites.some(fav => fav.title === storyResult.title) ? "Saved in Library" : "Save to Library"}
-                </button>
-              </div>
             </div>
+          )}
 
-            {/* Key Features diagnostic tabs below header */}
-            <div className="grid grid-cols-3 gap-3 pt-1 text-slate-700" id="diagnostic-pills">
-              <div className="bg-slate-50/50 rounded-xl p-2.5 border border-slate-100 text-center">
-                <span className="text-[9px] uppercase tracking-wider text-slate-400 block mb-0.5">Anchored Interest</span>
-                <span className="text-[10px] sm:text-xs font-semibold leading-tight block truncate" title={storyResult.keyFeatures.specialInterestUsed}>
-                  {storyResult.keyFeatures.specialInterestUsed}
-                </span>
-              </div>
-              <div className="bg-slate-50/50 rounded-xl p-2.5 border border-slate-100 text-center">
-                <span className="text-[9px] uppercase tracking-wider text-slate-400 block mb-0.5">superpower featured</span>
-                <span className="text-[10px] sm:text-xs font-semibold leading-tight block text-sky-600 truncate" title={storyResult.keyFeatures.strengthsCelebrated}>
-                  {storyResult.keyFeatures.strengthsCelebrated}
-                </span>
-              </div>
-              <div className="bg-slate-50/50 rounded-xl p-2.5 border border-slate-100 text-center">
-                <span className="text-[9px] uppercase tracking-wider text-slate-400 block mb-0.5">Sensory Level</span>
-                <span className="text-[10px] sm:text-xs font-semibold leading-tight block text-violet-600 truncate" title={storyResult.keyFeatures.sensoryLevel}>
-                  {storyResult.keyFeatures.sensoryLevel}
-                </span>
-              </div>
-            </div>
+          {/* 4. ACTIVE storybook reader */}
+          {story && !isGenerating && (
+            <div className="bg-[#FCFAF7] border border-[#ECCFBA] rounded-3xl p-5 md:p-7 shadow-xs relative" id="story-reader-module">
+              
+              {/* Reader Action Ribbon: Save to shelf & Custom font sizes */}
+              <div className="flex items-center justify-between border-b border-[#ECCFBA]/60 pb-4 mb-5 text-xs text-amber-900 font-sans">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleAddToBookshelf}
+                    className="inline-flex cursor-pointer items-center gap-1 bg-[#FAF6F0] hover:bg-amber-100 border border-[#E1D4C1] text-amber-900 rounded-xl px-3 py-2 font-bold transition active:scale-95"
+                  >
+                    <Heart className={`h-4.5 w-4.5 transition ${bookshelf.some(b => b.title === story.title) ? "text-red-500 fill-red-500" : "text-amber-800"}`} />
+                    <span>{bookshelf.some(b => b.title === story.title) ? "On Your Bookshelf! ❤️" : "Save to Bookshelf"}</span>
+                  </button>
+                </div>
 
-            {/* Structured story sections */}
-            <div className="prose max-w-none text-slate-700 leading-relaxed font-sans" id="markdown-story-body">
-              {parseAndRenderContentMarkup(storyResult)}
-            </div>
-
-            {/* Ending comforting badge */}
-            <div className="pt-6 border-t border-slate-100 flex items-center justify-center text-center">
-              <div className="inline-flex items-center gap-1.5 bg-sky-50 px-4 py-2 rounded-full border border-sky-100 text-xs font-semibold text-sky-800">
-                <Smile className="h-4 w-4 text-sky-600 fill-sky-200 animate-bounce" />
-                <span>The End of a Gentle Adventure</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-amber-800/60 font-medium">Font size:</span>
+                  <div className="inline-flex bg-[#FAF6F0] border border-[#E1D4C1] rounded-xl p-0.5">
+                    <button
+                      onClick={() => setReaderFontSize("md")}
+                      className={`px-2 py-1 text-[10.5px] cursor-pointer rounded-lg font-bold ${readerFontSize === "md" ? "bg-amber-600 text-white shadow-3xs" : "text-amber-800 hover:text-amber-950"}`}
+                    >
+                      A
+                    </button>
+                    <button
+                      onClick={() => setReaderFontSize("lg")}
+                      className={`px-2.5 py-1 text-[12.5px] cursor-pointer rounded-lg font-bold ${readerFontSize === "lg" ? "bg-amber-600 text-white shadow-3xs" : "text-amber-800 hover:text-amber-950"}`}
+                    >
+                      A
+                    </button>
+                    <button
+                      onClick={() => setReaderFontSize("xl")}
+                      className={`px-3 py-1 text-[14.5px] cursor-pointer rounded-lg font-bold ${readerFontSize === "xl" ? "bg-amber-600 text-white shadow-3xs" : "text-amber-800 hover:text-amber-950"}`}
+                    >
+                      A
+                    </button>
+                  </div>
+                </div>
               </div>
+
+              {/* BOOK CONTAINER LAYOUT */}
+              <div className="min-h-[460px] flex flex-col justify-between" id="virtual-book-canvas">
+                
+                {/* PAGE CONTAINER */}
+                <div className="flex-1 py-1">
+                  
+                  {/* COVER PAGE (INDEX 0) */}
+                  {currentPageIndex === 0 && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="flex flex-col md:flex-row gap-6 items-center"
+                      id="storybook-cover-sheet"
+                    >
+                      {/* Left Block: Hardcover Image Graphic */}
+                      <div className="w-full md:w-1/2 flex justify-center">
+                        <div className="relative w-full max-w-[270px] aspect-[3/4] rounded-2xl shadow-md border-r-8 border-amber-950/20 bg-gradient-to-tr from-[#FAF6F0] to-[#EADBC8] overflow-hidden flex items-center justify-center">
+                          {coverImageLoading ? (
+                            <div className="text-center p-6 space-y-3">
+                              <Loader2 className="h-8 w-8 text-amber-600 animate-spin mx-auto" />
+                              <span className="block text-[11px] font-bold text-amber-800 font-sans tracking-tight">Finishing hand-drawn cover art...</span>
+                            </div>
+                          ) : story.coverImageUrl ? (
+                            <img
+                              src={story.coverImageUrl}
+                              alt="Cozy Personalized Cover"
+                              className="w-full h-full object-cover rounded-xl select-none"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <div className="text-center p-5 space-y-2">
+                              {/* Classic vector stylized book placeholder */}
+                              <Sparkle className="h-10 w-10 text-amber-500 fill-amber-300 mx-auto animate-pulse" />
+                              <span className="block text-[10px] text-amber-800/70 font-sans font-medium">Vector Cover Fallback Active</span>
+                            </div>
+                          )}
+                          
+                          {/* Book cover Spine accent layout */}
+                          <div className="absolute top-0 left-0 bottom-0 w-3 bg-amber-950/20" />
+                        </div>
+                      </div>
+
+                      {/* Right Block: Cover Title Metadata */}
+                      <div className="w-full md:w-1/2 space-y-4 text-center md:text-left">
+                        <span className="inline-block text-[10px] uppercase font-bold text-amber-700/80 tracking-widest bg-amber-100/40 px-2.5 py-1 rounded-full">
+                          ⭐ A Personalized Adventure
+                        </span>
+                        
+                        <h3 className="text-2xl md:text-3xl font-extrabold text-amber-950 font-display leading-tight">
+                          {story.title}
+                        </h3>
+
+                        <p className="text-[#8B5E3C] text-xs font-sans">
+                          Written especially for <strong className="text-amber-950">{formData.name}</strong> • Age {formData.age} • Pronouns {formData.pronouns}
+                        </p>
+
+                        <div className="bg-amber-100/20 border border-amber-250/30 rounded-2xl p-3.5 space-y-2 text-xs text-amber-950 text-left">
+                          <span className="font-bold text-amber-900 block font-sans">💡 Autistic Strength Highlighted:</span>
+                          <p className="text-amber-850/80 leading-relaxed font-sans text-[11px]">
+                            {story.keyFeatures?.strengthsCelebrated || "Celebrating deep pattern logic and incredible focus!"}
+                          </p>
+                        </div>
+                        
+                        {story.characterAppearance && (
+                          <div className="text-[10px] text-amber-800/60 leading-normal border-t border-amber-900/10 pt-2 text-left font-serif max-h-16 overflow-y-auto">
+                            <strong>Consistent Hero style:</strong> {story.characterAppearance}
+                          </div>
+                        )}
+                        
+                        <p className="text-[#C5A384] text-[11px] font-sans font-medium">
+                          👉 Press Next Page below to start reading the chapter!
+                        </p>
+                      </div>
+
+                    </motion.div>
+                  )}
+
+                  {/* PARCHMENT CONTENT PAGE (INDEX 1+) */}
+                  {currentPageIndex > 0 && pages[currentPageIndex - 1] && (
+                    <motion.div
+                      key={currentPageIndex}
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="bg-[#FAF6F0] rounded-2xl p-6 border border-[#ECCFBA]/45 shadow-3xs"
+                      id={`storybook-page-${currentPageIndex}`}
+                    >
+                      {/* Page number badge */}
+                      <div className="text-right text-[11px] font-mono text-amber-600/60 mb-3 uppercase tracking-wider font-bold">
+                        Page {currentPageIndex} of {pages.length}
+                      </div>
+
+                      {/* Display readable content */}
+                      <div className={`text-amber-950 font-serif leading-relaxed tracking-wide space-y-4 text-left ${
+                        readerFontSize === "md" ? "text-sm sm:text-base" :
+                        readerFontSize === "lg" ? "text-base sm:text-lg" : "text-lg sm:text-xl"
+                      }`}>
+                        {pages[currentPageIndex - 1].split('\n\n').map((paragraph, pIdx) => (
+                          <p key={pIdx}>
+                            {paragraph.trim().replace(/^---$/g, "")}
+                          </p>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+
+                </div>
+
+                {/* BOTTOM STORYBOOK PAGE FLIPPER CONTROLS */}
+                <div className="flex items-center justify-between border-t border-[#ECCFBA]/60 pt-4 mt-6">
+                  {/* Previous page button */}
+                  <button
+                    onClick={() => setCurrentPageIndex(prev => Math.max(0, prev - 1))}
+                    disabled={currentPageIndex === 0}
+                    className={`inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl cursor-pointer transition ${
+                      currentPageIndex === 0 
+                        ? "text-amber-900/30 bg-transparent cursor-not-allowed" 
+                        : "text-[#623E1C] bg-amber-100 hover:bg-amber-200"
+                    }`}
+                  >
+                    <ChevronLeft className="h-4 w-4" /> Cover
+                  </button>
+
+                  <div className="text-xs font-mono font-bold text-amber-800">
+                    {currentPageIndex === 0 ? "📙 Cover Page" : `📖 Chapter Page ${currentPageIndex}`}
+                  </div>
+
+                  {/* Next page button */}
+                  <button
+                    onClick={() => setCurrentPageIndex(prev => Math.min(totalBookPages - 1, prev + 1))}
+                    disabled={currentPageIndex === totalBookPages - 1}
+                    className={`inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl cursor-pointer transition ${
+                      currentPageIndex === totalBookPages - 1 
+                        ? "text-amber-900/30 bg-transparent cursor-not-allowed" 
+                        : "text-white bg-amber-600 hover:bg-amber-700"
+                    }`}
+                  >
+                    Next <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+
+              </div>
+
             </div>
-          </motion.div>
-        )}
+          )}
+
+          {/* 5. INTERACTIVE WOODEN BOOKSHELF */}
+          <div className="bg-[#FAF6F0] border border-[#E9DFD0] rounded-3xl p-5 shadow-xs relative" id="cozy-bookshelf-component">
+            <h3 className="text-md font-bold text-amber-900 font-display mb-4 flex items-center gap-2">
+              <Bookmark className="h-4 w-4 text-amber-700 fill-amber-300" />
+              <span>My Warm Wooden Bookshelf ({bookshelf.length})</span>
+            </h3>
+
+            {bookshelf.length === 0 ? (
+              <div className="border border-dashed border-amber-950/20 rounded-2xl p-6 text-center text-xs text-amber-800/60 font-serif italic">
+                Your shelf is empty! Craft a tale, and click "Save to Bookshelf" to collect your children's book series here in order.
+              </div>
+            ) : (
+              <div className="space-y-4" id="bookshelf-list">
+                
+                {/* Visual Wooden Shelf Board Layout */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pb-2" id="bookshelf-row">
+                  {bookshelf.map((book) => (
+                    <button
+                      key={book.id}
+                      onClick={() => {
+                        setStory(book);
+                        setCurrentPageIndex(0);
+                        if (book.inputs) {
+                          setFormData(book.inputs);
+                        }
+                      }}
+                      className="cursor-pointer group flex flex-col focus:outline-none text-left bg-white border border-[#EDE4D9] rounded-2xl p-3 shadow-3xs hover:shadow-xs hover:border-[#D5C2AD] transition-all relative overflow-hidden"
+                    >
+                      {/* Cover spine ornament strip */}
+                      <div className="absolute top-0 bottom-0 left-0 w-1.5 bg-amber-800/40 group-hover:bg-amber-800/80 transition" />
+
+                      {/* Small visual image cover frame if exists */}
+                      <div className="aspect-[3/4] w-full rounded-lg bg-[#FAF6F0] mb-2 overflow-hidden flex items-center justify-center border border-amber-900/10">
+                        {book.coverImageUrl ? (
+                          <img
+                            src={book.coverImageUrl}
+                            alt="Book Miniature"
+                            className="w-full h-full object-cover rounded-md"
+                          />
+                        ) : (
+                          <BookOpen className="h-6 w-6 text-amber-400 group-hover:scale-110 transition" />
+                        )}
+                      </div>
+
+                      <div className="flex-1 min-w-0 pl-1">
+                        <h4 className="text-[12px] font-bold text-amber-950 truncate group-hover:text-amber-700">
+                          {book.title}
+                        </h4>
+                        <p className="text-[10px] text-amber-800/70 block font-sans">
+                          For {book.inputs?.name || "Cozy Star"} • {book.createdAt || "Curated"}
+                        </p>
+                      </div>
+
+                      {/* Remove delete clicker utility */}
+                      <button
+                        onClick={(e) => handleRemoveFromBookshelf(book.id || "", e)}
+                        className="cursor-pointer absolute top-1 right-1 p-1 bg-white/90 rounded-md border border-amber-100 opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-600 transition text-[#A48261]"
+                        title="Remove from shelf"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Wooden Board shelf line overlay */}
+                <div className="h-3 bg-gradient-to-b from-[#A07044] to-[#7F5027] rounded-full shadow-3xs border-b border-[#5E3614]" />
+                
+              </div>
+            )}
+          </div>
+
+        </div>
 
       </div>
 

@@ -1,139 +1,142 @@
 import { motion } from "motion/react";
-import { Sparkles, Heart, Brain, EyeOff, BookOpen, Compass } from "lucide-react";
+import { Sparkles, Heart, Brain, EyeOff, BookOpen, Compass, Sparkle } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export default function Home() {
   const pillars = [
     {
       id: "lit-lang",
-      icon: <Brain className="h-6 w-6 text-sky-600" />,
+      icon: <Brain className="h-6 w-6 text-amber-900" />,
       title: "Literal Language First",
-      desc: "We write using clean, concrete phrasing. We completely avoid confusing metaphors, double-meanings, or sarcastic expressions so everything remains clear and reassuring."
+      desc: "Our storyteller uses clear, descriptive, concrete nouns. We strictly avoid confusing metaphor, sarcasm, or complex idioms, supporting seamless and understandable reading."
     },
     {
       id: "spec-int",
-      icon: <Sparkles className="h-6 w-6 text-pink-500" />,
-      title: "Special Interests Weaved In",
-      desc: "Passions like trains, stellar coordinate charts, or dinosaurs become the main character's discovery. Their hyperfocus is celebrated as an empowering, joyful superpower."
+      icon: <Sparkles className="h-6 w-6 text-[#E47936]" />,
+      title: "Special Interests Highlight",
+      desc: "Passions like trains, ticking gears, dinosaurs, or maps become the comforting theme of discovery in their tale. Their intense focus is celebrated as a fantastic superpower!"
     },
     {
       id: "safe-pred",
-      icon: <EyeOff className="h-6 w-6 text-violet-500" />,
-      title: "Safe & Predictable Flows",
-      desc: "Low-sensory pacing, reassuring repetition, and a guaranteed peaceful ending. No sudden surprises, no scary cliffhangers, and no sensory overload."
+      icon: <EyeOff className="h-6 w-6 text-[#A56839]" />,
+      title: "Low-Sensory Safe Flow",
+      desc: "Orderly descriptive pacing and a reassuring, predictable plot. We generate a beautiful Book Cover Illustration to keep things visual while disabling inner-page images."
     }
   ];
 
   return (
-    <div className="space-y-16">
-      {/* Hero Banner */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-sky-50 via-sky-100/50 to-indigo-50/50 p-8 sm:p-14 border border-sky-100/40" id="hero-banner">
-        {/* Soft floating ambient shapes */}
-        <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-pink-100/40 blur-3xl opacity-60" />
-        <div className="absolute -left-16 -bottom-16 h-64 w-64 rounded-full bg-sky-200/40 blur-3xl opacity-60" />
+    <div className="space-y-16 py-2" id="warm-home-viewport">
+      
+      {/* 1. Hero Block with terracotta / warm clay tone gradient background */}
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#FEFAF4] via-[#F8EDE2] to-[#FAF3EA] p-8 sm:p-14 border border-[#EADBCC]" id="warm-hero-banner">
+        
+        {/* Amber glowing orb shapes in background */}
+        <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-orange-100/40 blur-3xl opacity-70" />
+        <div className="absolute -left-16 -bottom-16 h-64 w-64 rounded-full bg-amber-200/30 blur-3xl opacity-60" />
 
         <div className="relative max-w-2xl space-y-6">
           <motion.div
-            initial={{ opacity: 0, y: 15 }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="inline-flex items-center gap-1.5 rounded-full bg-sky-100/80 px-4 py-1.5 text-xs font-semibold text-sky-800"
+            transition={{ duration: 0.5 }}
+            className="inline-flex items-center gap-1.5 rounded-full bg-orange-100/60 border border-orange-200/40 px-3.5 py-1 text-xs font-bold text-orange-950"
           >
-            <Heart className="h-3.5 w-3.5 fill-sky-800 text-sky-800" />
-            Nurturing & Gentle
+            <Heart className="h-3.5 w-3.5 fill-orange-850 text-orange-850" />
+            Comforting & Low Stimulation
           </motion.div>
 
           <motion.h1
-            initial={{ opacity: 0, y: 15 }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-3xl sm:text-4xl lg:text-5xl font-sans font-medium tracking-tight text-slate-800 leading-tight"
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="text-3xl sm:text-4xl lg:text-5xl font-display font-extrabold tracking-tight text-[#4A2C11] leading-tight"
           >
-            Calm, Personalized Stories <br />
-            <span className="text-sky-600">For Your Unique Child</span>
+            Settle Down with <br />
+            <span className="text-[#B95C17]">A Personalized Story</span>
           </motion.h1>
 
           <motion.p
-            initial={{ opacity: 0, y: 15 }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="text-base sm:text-lg text-slate-600 font-sans leading-relaxed"
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="text-sm sm:text-base text-amber-900/80 font-serif leading-relaxed"
           >
-            GlowTales creates gentle full-stack storybooks that celebrate how autistic and neurodivergent children process the world, weaving their deepest passions into soothing heroic adventures.
+            Welcome to GlowTales. We weave personalized, gentle storybooks that celebrate how neurodivergent children process the world, placing their passionate interests at the center of cozy, structured adventures.
           </motion.p>
 
           <motion.div
-            initial={{ opacity: 0, y: 15 }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="pt-4 flex flex-col sm:flex-row gap-4"
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="pt-3 flex flex-col sm:flex-row gap-4"
           >
             <Link
               to="/create"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-6 py-3.5 text-sm font-medium text-white shadow-sm transition hover:bg-sky-700 active:scale-98 cursor-pointer"
+              className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-amber-600 px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-amber-700 active:scale-98"
               id="cta-create-story"
             >
-              <Sparkles className="h-4 w-4" />
-              Create a Story Now
+              <Sparkles className="h-4 w-4 fill-white" />
+              Formulate a Tale
             </Link>
             <Link
               to="/examples"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-white border border-slate-200/80 px-6 py-3.5 text-sm font-medium text-slate-700 shadow-xs transition hover:bg-slate-50 active:scale-98 cursor-pointer"
+              className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-white border border-[#E2D6C5] px-6 py-3 text-sm font-bold text-amber-950 shadow-3xs transition hover:bg-amber-50/50 active:scale-98"
               id="cta-view-examples"
             >
-              <BookOpen className="h-4 w-4 text-slate-500" />
-              Browse Example Tales
+              <BookOpen className="h-4 w-4 text-amber-800" />
+              View Example Tales
             </Link>
           </motion.div>
         </div>
       </section>
 
-      {/* Pillars Section */}
+      {/* 2. Three Pillars Section */}
       <section className="space-y-10" id="pillars-section">
         <div className="text-center max-w-xl mx-auto space-y-3">
-          <span className="text-xs font-semibold uppercase tracking-wider text-sky-600 bg-sky-50 px-2.5 py-1 rounded">Our Methodology</span>
-          <h2 className="text-2xl sm:text-3xl font-medium text-slate-800 font-sans">Designed for Neurodivergent Comfort</h2>
-          <p className="text-sm text-slate-600 font-sans">We prioritize safety, order, and quiet celebration to help your child feel recognized, happy, and fully relaxed.</p>
+          <span className="text-xs font-bold uppercase tracking-wider text-amber-700 bg-amber-50 border border-amber-200/40 px-2.5 py-1 rounded-full">Our Story Philosophy</span>
+          <h2 className="text-2xl sm:text-3xl font-display font-bold text-amber-950">Designed for Neurodivergent Readers</h2>
+          <p className="text-xs sm:text-sm text-amber-900/70">We prioritize absolute clarity, cognitive predictability, and warm interest-celebration to help your child feel recognized and perfectly safe.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {pillars.map((pillar, index) => (
             <motion.div
               key={pillar.id}
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 15 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              className="bg-white rounded-2xl p-6 border border-slate-100 shadow-xs transition hover:shadow-md flex flex-col items-start space-y-4"
+              transition={{ duration: 0.45, delay: index * 0.1 }}
+              className="bg-[#FAF6F0] rounded-2xl p-6 border border-[#E9DFD0] shadow-3xs transition hover:shadow-xs flex flex-col items-start space-y-4"
               id={`pillar-card-${pillar.id}`}
             >
-              <div className="p-3 bg-slate-50 rounded-xl">
+              <div className="p-3 bg-amber-100/50 rounded-xl">
                 {pillar.icon}
               </div>
-              <h3 className="text-base font-semibold text-slate-800 font-sans">{pillar.title}</h3>
-              <p className="text-xs text-slate-500 font-sans leading-relaxed flex-1">{pillar.desc}</p>
+              <h3 className="text-md font-bold text-amber-950 font-display">{pillar.title}</h3>
+              <p className="text-xs text-amber-900/80 font-serif leading-relaxed flex-1">{pillar.desc}</p>
             </motion.div>
           ))}
         </div>
       </section>
 
-      {/* Comforting Quick Guide Callout */}
-      <section className="bg-indigo-50/60 rounded-3xl p-6 sm:p-10 border border-indigo-100/40 flex flex-col sm:flex-row items-center gap-6 sm:gap-10" id="callout-guide">
-        <div className="p-4 bg-white rounded-2xl shadow-xs shrink-0">
-          <Compass className="h-10 w-10 text-indigo-500" />
+      {/* 3. Helper callout */}
+      <section className="bg-[#FAF6F0] rounded-3xl p-6 sm:p-10 border border-[#E9DFD0]/80 flex flex-col sm:flex-row items-center gap-6 sm:gap-10" id="callout-guide">
+        <div className="p-4 bg-[#F5EAD9] rounded-2xl shadow-3xs shrink-0">
+          <Compass className="h-10 w-10 text-amber-800" />
         </div>
-        <div className="space-y-2 flex-1">
-          <h3 className="text-lg font-medium text-indigo-950 font-sans">New to GlowTales?</h3>
-          <p className="text-xs sm:text-sm text-indigo-900/80 font-sans leading-relaxed">
-            Discover how Peter designed this for his own family, or check how Willow Creek Station functions for Leo. Everything is modeled to reduce sensory noise and increase joy.
+        <div className="space-y-2 flex-1 text-center sm:text-left">
+          <h3 className="text-md font-bold text-amber-950 font-display">New to the Library?</h3>
+          <p className="text-xs sm:text-sm text-amber-900/85 font-serif leading-relaxed">
+            Everything in GlowTales is crafted to minimize sensory anxiety and maximize deep, quiet connection. Learn about the structure or view a ready-made illustration from the shelf!
           </p>
-          <div className="pt-2 flex flex-wrap gap-4 text-xs font-semibold text-indigo-600 font-sans">
-            <Link to="/why-us" className="hover:underline font-bold text-sky-600 cursor-pointer">Why We are Free &rarr;</Link>
-            <Link to="/how-it-works" className="hover:underline cursor-pointer">Explore the Methodology &rarr;</Link>
-            <Link to="/about" className="hover:underline cursor-pointer">Read Peter's Story &rarr;</Link>
+          <div className="pt-2 flex flex-wrap justify-center sm:justify-start gap-5 text-xs font-bold text-amber-700 font-sans">
+            <Link to="/why-us" className="hover:underline text-amber-800">Why are We Free &rarr;</Link>
+            <Link to="/how-it-works" className="hover:underline">Methodology Guide &rarr;</Link>
+            <Link to="/about" className="hover:underline">Peter's Backstory &rarr;</Link>
           </div>
         </div>
       </section>
+
     </div>
   );
 }
