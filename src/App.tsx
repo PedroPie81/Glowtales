@@ -18,7 +18,8 @@ export default function App() {
 
   useEffect(() => {
     // Check parameters on load to preserve the parent dynamic auth contexts
-    searchAndStoreApiKey();
+    const key = searchAndStoreApiKey();
+    console.log("[GlowTales Auth] Synchronizing dynamic API security keys state on load:", { active: !!key });
 
     // Elegant real-time display (UTC) for neurodivergent predictability
     const tick = () => {
