@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Sparkles, Compass, BookOpen, Clock, Heart, Menu, X, Star } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Routes, Route, Link, Navigate, useLocation } from "react-router-dom";
+import { searchAndStoreApiKey } from "./lib/auth";
 import Home from "./components/Home";
 import CreateStory from "./components/CreateStory";
 import Examples from "./components/Examples";
@@ -16,6 +17,9 @@ export default function App() {
   const { pathname } = location;
 
   useEffect(() => {
+    // Check parameters on load to preserve the parent dynamic auth contexts
+    searchAndStoreApiKey();
+
     // Elegant real-time display (UTC) for neurodivergent predictability
     const tick = () => {
       const d = new Date();

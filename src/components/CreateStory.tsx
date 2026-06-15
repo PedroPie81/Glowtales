@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { StoryInput, StoryResult } from "../types";
+import { getAuthHeaders } from "../lib/auth";
 import { 
   Sparkles, 
   ChevronRight, 
@@ -147,13 +148,15 @@ export default function CreateStory() {
       // Step A: Generate narrative and cover prompt
       const storyRes = await fetch("/api/generate-story", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(formData)
       });
 
       if (!storyRes.ok) {
         const errorJson = await storyRes.json().catch(() => ({}));
-        throw new Error(errorJson.error || `Story generation failed with status: ${storyRes.status}`);
+        const errObj: any = new Error(errorJson.error || `Story generation failed with status: ${storyRes.status}`);
+        errObj.details = errorJson.details;
+        throw errObj;
       }
 
       const storyData: StoryResult = await storyRes.json();
@@ -166,7 +169,7 @@ export default function CreateStory() {
       try {
         const imageRes = await fetch("/api/generate-image", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: getAuthHeaders(),
           body: JSON.stringify({
             coverIllustrationPrompt: storyData.coverIllustrationPrompt,
             characterAppearance: storyData.characterAppearance,
@@ -188,8 +191,8 @@ export default function CreateStory() {
     } catch (err: any) {
       console.error(err);
       setErrorState({
-        message: err.message || "The story creation encounter a little quiet spot.",
-        details: "Check that your GEMINI_API_KEY is configured in Settings > Secrets or try again shortly."
+        message: err.message || "The story creation encountered a little quiet spot.",
+        details: err.details || "Check that your GEMINI_API_KEY is configured in Settings > Secrets or try again shortly."
       });
       setIsGenerating(false);
       setCoverImageLoading(false);
