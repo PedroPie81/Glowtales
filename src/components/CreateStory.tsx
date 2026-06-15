@@ -1,3 +1,5 @@
+// GlowTales Comfort Library Client Component
+// Version: 1.1.2 (Supports local favorites preservation and predictive story restoration)
 import { useState, useRef, useEffect } from "react";
 import { StoryInput, StoryResult } from "../types";
 import { 
