@@ -19,7 +19,8 @@ import {
   Camera,
   UploadCloud,
   SkipBack,
-  Users
+  Users,
+  Trash2
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import StoryIllustration from "./StoryIllustration";
@@ -61,6 +62,34 @@ export default function CreateStory() {
   
   // Custom narrative creation step
   const [activeFormStep, setActiveFormStep] = useState<"profile" | "comfort" | "format">("profile");
+
+  // Local Favorites Library State
+  const [favorites, setFavorites] = useState<StoryResult[]>([]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("glowtales_library");
+    if (saved) {
+      try {
+        setFavorites(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to parse favorites library:", e);
+      }
+    }
+  }, []);
+
+  const handleSaveToFavorites = () => {
+    if (!storyResult) return;
+    const exists = favorites.some(fav => fav.title === storyResult.title);
+    let updated: StoryResult[];
+    if (exists) {
+      // Remove if already clicked (toggle behavior)
+      updated = favorites.filter(fav => fav.title !== storyResult.title);
+    } else {
+      updated = [storyResult, ...favorites];
+    }
+    setFavorites(updated);
+    localStorage.setItem("glowtales_library", JSON.stringify(updated));
+  };
 
 
 
@@ -858,6 +887,61 @@ export default function CreateStory() {
           </form>
         </div>
 
+        {/* Your Saved Tales (Library) */}
+        {favorites.length > 0 && (
+          <div className="bg-white rounded-3xl border border-slate-100 p-5 space-y-3 shadow-xs">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <BookOpen className="h-3.5 w-3.5 text-sky-500" />
+              Your Comfort Library ({favorites.length})
+            </h3>
+            <p className="text-[11px] text-slate-400 leading-normal font-sans">
+              Autistic children thrive on repetition. These saved stories preserve the exact imagery and comforting text for perfect predictability.
+            </p>
+            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+              {favorites.map((fav, idx) => (
+                <div 
+                  key={idx} 
+                  className="group flex items-center justify-between p-2.5 rounded-xl border border-slate-50 hover:border-sky-100 hover:bg-sky-50/20 transition text-left"
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStoryResult(fav);
+                      // Pre-populate child's name
+                      if (fav.title) {
+                        const namePart = fav.title.split(" ")[0];
+                        if (namePart && namePart.length > 1) {
+                          setFormData(prev => ({ ...prev, name: namePart }));
+                        }
+                      }
+                    }}
+                    className="flex-1 text-left cursor-pointer pr-2"
+                  >
+                    <div className="text-xs font-semibold text-slate-700 font-sans group-hover:text-sky-700 transition line-clamp-1">
+                      {fav.title}
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5 font-mono truncate">
+                      ⭐ {fav.keyFeatures.specialInterestUsed}
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const updated = favorites.filter((_, i) => i !== idx);
+                      setFavorites(updated);
+                      localStorage.setItem("glowtales_library", JSON.stringify(updated));
+                    }}
+                    className="text-slate-300 hover:text-red-500 p-1 rounded-lg transition"
+                    title="Remove story"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Comforting literary note */}
         <div className="bg-sky-50/50 rounded-2xl border border-sky-100 p-4 text-xs text-sky-900/85 font-sans leading-relaxed space-y-1">
           <span className="font-semibold text-sky-800 flex items-center gap-1.5">
@@ -969,6 +1053,20 @@ export default function CreateStory() {
                   <Smile className="h-3.5 w-3.5" />
                   <span>Personalized story for {formData.name}</span>
                 </div>
+              </div>
+              <div className="shrink-0">
+                <button
+                  type="button"
+                  onClick={handleSaveToFavorites}
+                  className={`cursor-pointer inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold shadow-xs transition active:scale-95 border ${
+                    favorites.some(fav => fav.title === storyResult.title)
+                      ? "bg-rose-50 border-rose-100 text-rose-700"
+                      : "bg-white border-slate-100 text-slate-600 hover:bg-slate-50 hover:text-slate-800"
+                  }`}
+                >
+                  <Heart className={`h-4 w-4 ${favorites.some(fav => fav.title === storyResult.title) ? "fill-rose-500 text-rose-500" : ""}`} />
+                  {favorites.some(fav => fav.title === storyResult.title) ? "Saved in Library" : "Save to Library"}
+                </button>
               </div>
             </div>
 
