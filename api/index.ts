@@ -38,22 +38,48 @@ app.use((req, res, next) => {
   next();
 });
 
-// Lazy initializer for Google Gen AI with dynamic hot-swapping support for updated keys
-let cachedApiKey: string | null = null;
-let aiInstance: GoogleGenAI | null = null;
+// Lazy initializer for Google Gen AI with dynamic hot-swapping and request-header auth support
+const aiClientsCache = new Map<string, GoogleGenAI>();
 
-function getGoogleGenAI(): GoogleGenAI {
-  const currentKey = (process.env.GEMINI_API_KEY || "").trim();
-  if (!aiInstance || cachedApiKey !== currentKey) {
-    console.log("Configuring or Refreshing Google Gen AI Client instance:", {
-      hasKey: !!currentKey,
-      keyLength: currentKey.length,
-      prefix: currentKey ? currentKey.substring(0, 5) : "none"
-    });
-    if (!currentKey || currentKey === "MY_GEMINI_API_KEY") {
-      throw new Error("GEMINI_API_KEY is unset or set to placeholder. Please configure your key in Settings > Secrets within Google AI Studio.");
+function getGoogleGenAI(req?: express.Request): GoogleGenAI {
+  let reqKey = "";
+  if (req) {
+    // 1. Check incoming HTTP headers for dynamic auth injection from the platform or proxy
+    const authHeader = req.headers.authorization || req.headers["authorization"];
+    if (authHeader && typeof authHeader === "string") {
+      reqKey = authHeader.replace(/^Bearer\s+/i, "").trim();
     }
+    if (!reqKey) {
+      const xGoogKey = req.headers["x-goog-api-key"] || req.headers["x-api-key"] || req.headers["X-Goog-Api-Key"] || req.headers["X-Api-Key"];
+      if (xGoogKey && typeof xGoogKey === "string") {
+        reqKey = xGoogKey.trim();
+      }
+    }
+    if (!reqKey) {
+      const queryKey = req.query.apiKey || req.query.apikey || req.query.token;
+      if (queryKey && typeof queryKey === "string") {
+        reqKey = queryKey.trim();
+      }
+    }
+  }
 
+  // Fall back to process.env.GEMINI_API_KEY
+  const currentKey = (reqKey || process.env.GEMINI_API_KEY || "").trim();
+
+  // Log clean diagnostics without exposing full credentials
+  console.log("[getGoogleGenAI Dialect] Resolving credentials:", {
+    source: reqKey ? (reqKey.startsWith("ya29.") ? "HTTP Authorization Header (OAuth Token)" : "HTTP Request Headers (API Key)") : "statically defined process.env.GEMINI_API_KEY",
+    hasKey: !!currentKey,
+    keyLength: currentKey.length,
+    prefix: currentKey ? currentKey.substring(0, 5) : "none"
+  });
+
+  if (!currentKey || currentKey === "MY_GEMINI_API_KEY") {
+    throw new Error("GEMINI_API_KEY is unset or set to placeholder. Please configure your key in Settings > Secrets within Google AI Studio.");
+  }
+
+  let client = aiClientsCache.get(currentKey);
+  if (!client) {
     const isAccessToken = currentKey.startsWith("ya29.");
     const sdkOptions: any = {
       apiKey: isAccessToken ? "" : currentKey,
@@ -65,15 +91,15 @@ function getGoogleGenAI(): GoogleGenAI {
     };
 
     if (isAccessToken) {
-      console.log("Configuring with live OAuth access token (ya29.) bypass");
+      console.log("Configuring Gemini with live OAuth token (ya29.) session bypass");
       sdkOptions.httpOptions.baseUrl = "https://generativelanguage.googleapis.com";
       sdkOptions.httpOptions.headers['Authorization'] = `Bearer ${currentKey}`;
     }
 
-    aiInstance = new GoogleGenAI(sdkOptions);
-    cachedApiKey = currentKey;
+    client = new GoogleGenAI(sdkOptions);
+    aiClientsCache.set(currentKey, client);
   }
-  return aiInstance;
+  return client;
 }
 
 // Helper to safely serialize any error object into a clean string representation
@@ -107,8 +133,8 @@ function isAuthOrPermissionError(error: any): boolean {
   );
 }
 
-// Error formatter for Gemini interactions
-function handleGeminiError(error: any, context = "action") {
+// Error formatter for Gemini interactions with request context to prevent false api-key-missing alarms
+function handleGeminiError(error: any, context = "action", req?: express.Request) {
   console.log(`[Gemini Sync] API Error in ${context}:`, error);
   const errorString = getCleanErrorString(error);
   
@@ -118,9 +144,21 @@ function handleGeminiError(error: any, context = "action") {
                              errorString.includes("ACCESS_TOKEN_SCOPE_INSUFFICIENT") ||
                              errorString.includes("PERMISSION_DENIED");
                              
-  const isApiKeyMissingOrInvalid = !process.env.GEMINI_API_KEY || 
-                                   process.env.GEMINI_API_KEY.trim() === "" ||
-                                   process.env.GEMINI_API_KEY === "MY_GEMINI_API_KEY";
+  let resolvedKey = "";
+  if (req) {
+    const authHeader = req.headers.authorization || req.headers["authorization"];
+    if (authHeader && typeof authHeader === "string") {
+      resolvedKey = authHeader.replace(/^Bearer\s+/i, "").trim();
+    }
+    if (!resolvedKey) {
+      const xGoogKey = req.headers["x-goog-api-key"] || req.headers["x-api-key"] || req.headers["X-Goog-Api-Key"] || req.headers["X-Api-Key"];
+      if (xGoogKey && typeof xGoogKey === "string") {
+        resolvedKey = xGoogKey.trim();
+      }
+    }
+  }
+  const activeKey = resolvedKey || (process.env.GEMINI_API_KEY || "").trim();
+  const isApiKeyMissingOrInvalid = !activeKey || activeKey === "MY_GEMINI_API_KEY";
 
   if (isPermissionDenied || isApiKeyMissingOrInvalid || isAuthOrPermissionError(error)) {
     const rawMsg = error?.message || errorString || "No specific error text returned.";
@@ -298,7 +336,7 @@ Please structure your JSON response with:
     let selectedModel = "gemini-3.5-flash";
     try {
       console.log("Generating cozy story text with primary model: gemini-3.5-flash");
-      response = await withRetry(() => getGoogleGenAI().models.generateContent({
+      response = await withRetry(() => getGoogleGenAI(req).models.generateContent({
         model: "gemini-3.5-flash",
         contents: prompt,
         config
@@ -308,7 +346,7 @@ Please structure your JSON response with:
       console.log("[Quota Fallback] falling back to gemini-3.1-flash-lite...");
       try {
         selectedModel = "gemini-3.1-flash-lite";
-        response = await withRetry(() => getGoogleGenAI().models.generateContent({
+        response = await withRetry(() => getGoogleGenAI(req).models.generateContent({
           model: "gemini-3.1-flash-lite",
           contents: prompt,
           config
@@ -318,7 +356,7 @@ Please structure your JSON response with:
         console.log("[Quota Fallback] falling back to gemini-2.5-flash...");
         try {
           selectedModel = "gemini-2.5-flash";
-          response = await withRetry(() => getGoogleGenAI().models.generateContent({
+          response = await withRetry(() => getGoogleGenAI(req).models.generateContent({
             model: "gemini-2.5-flash",
             contents: prompt,
             config
@@ -338,7 +376,7 @@ Please structure your JSON response with:
     return res.json(storyData);
 
   } catch (error: any) {
-    const errorDetails = handleGeminiError(error, "story generation");
+    const errorDetails = handleGeminiError(error, "story generation", req);
     res.status(errorDetails.status).json({
       error: errorDetails.error,
       details: errorDetails.details
@@ -470,7 +508,7 @@ app.post("/api/generate-image", async (req, res) => {
     let base64ImageBytes = "";
 
     try {
-      apiResponse = await withRetry(() => getGoogleGenAI().models.generateContent({
+      apiResponse = await withRetry(() => getGoogleGenAI(req).models.generateContent({
         model: 'gemini-2.5-flash-image',
         contents: {
           parts: partsPayload,
@@ -504,7 +542,7 @@ app.post("/api/generate-image", async (req, res) => {
       
       try {
         selectedImageModel = "gemini-3.1-flash-image";
-        apiResponse = await withRetry(() => getGoogleGenAI().models.generateContent({
+        apiResponse = await withRetry(() => getGoogleGenAI(req).models.generateContent({
           model: 'gemini-3.1-flash-image',
           contents: {
             parts: partsPayload,
@@ -551,7 +589,7 @@ Please return ONLY a valid inline <svg> block.
 3. No fluorescent or overwhelming shapes, no sharp edges. Comforting pastel hues.
 4. Keep the code fully compatible. No markdown wrappers (\`\`\`svg or \`\`\`xml). Start your response directly with "<svg" and close with "</svg>".`;
 
-          const fallbackResponse = await withRetry(() => getGoogleGenAI().models.generateContent({
+          const fallbackResponse = await withRetry(() => getGoogleGenAI(req).models.generateContent({
             model: fallbackModel,
             contents: svgPrompt,
           }));
@@ -589,7 +627,7 @@ Please return ONLY a valid inline <svg> block.
     }
 
   } catch (error: any) {
-    const errorDetails = handleGeminiError(error, "book cover generation");
+    const errorDetails = handleGeminiError(error, "book cover generation", req);
     res.status(errorDetails.status).json({
       error: errorDetails.error,
       details: errorDetails.details
