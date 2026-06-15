@@ -447,8 +447,50 @@ app.post("/api/generate-image", async (req, res) => {
     }
     partsPayload.push({ text: fullImagePrompt });
 
+    // Helper for offline generic beautiful canvas SVGs when all APIs fail
+    const generateOfflineFallbackSvg = (desc: string, char: string, obj: string) => {
+      const seedText = desc + char + obj;
+      const paletteBackgrounds = ["#F1F5F9", "#FFFBEB", "#FDF2F8", "#F0FDF4", "#EFF6FF", "#FAF5FF"];
+      const bgIdx = Math.abs(seedText.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)) % paletteBackgrounds.length;
+      const bgColor = paletteBackgrounds[bgIdx];
+
+      // Format caption
+      const cleanDesc = desc.replace("Soft pastel children's book illustration, calm style, clear lines, non-overwhelming:", "").trim();
+      const croppedDesc = cleanDesc.length > 150 ? cleanDesc.substring(0, 147) + "..." : cleanDesc;
+
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" style="background-color:${bgColor}; font-family: 'Inter', system-ui, sans-serif;">
+        <rect x="25" y="25" width="750" height="400" rx="32" fill="none" stroke="rgba(0,0,0,0.04)" stroke-width="8"/>
+        <circle cx="120" cy="110" r="140" fill="rgba(255,255,255,0.4)"/>
+        <circle cx="120" cy="110" r="100" fill="rgba(255,255,255,0.6)"/>
+        <path d="M-100 450 Q 150 250, 400 450 Z" fill="rgba(255, 255, 255, 0.45)"/>
+        <path d="M250 450 Q 550 220, 850 450 Z" fill="rgba(255, 255, 255, 0.5)"/>
+        <path d="M100 450 Q 400 320, 700 450 Z" fill="rgba(255, 255, 255, 0.6)"/>
+        <circle cx="340" cy="80" r="6" fill="#FBBF24" opacity="0.6"/>
+        <circle cx="580" cy="140" r="4" fill="#FBBF24" opacity="0.5"/>
+        <circle cx="230" cy="190" r="3" fill="#3B82F6" opacity="0.4"/>
+        <circle cx="710" cy="110" r="5" fill="#3B82F6" opacity="0.4"/>
+        <g transform="translate(400, 200)">
+          <path d="M -90,-20 Q -60,-80 0,-40 Q 60,-80 90,-20 Q 130,10 90,50 Q 40,80 0,60 Q -45,80 -90,40 Q -130,15 -90,-20 Z" fill="white" opacity="0.8"/>
+          <g transform="scale(0.8) translate(-10, -5)">
+            <path d="M -60,20 L 60,20 L 70,35 L -50,35 Z" fill="#475569" opacity="0.75"/>
+            <path d="M -60,5 L 60,5 L 60,20 L -60,20 Z" fill="#3B82F6" opacity="0.8"/>
+            <path d="M -50,11 L 50,11" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+            <path d="M 0,-30 C -10,-45 -25,-30 0,0 C 25,-30 10,-45 0,-30 Z" fill="#F59E0B" opacity="0.9" transform="scale(0.8)"/>
+          </g>
+        </g>
+        <g transform="translate(100, 310)">
+          <rect x="0" y="0" width="600" height="90" rx="20" fill="white" opacity="0.95" />
+          <rect x="0" y="0" width="600" height="90" rx="20" fill="none" stroke="rgba(0,0,0,0.05)" stroke-width="1.5" />
+          <text x="300" y="38" text-anchor="middle" fill="#0F172A" font-size="14" font-weight="600" letter-spacing="-0.01em">Cozy Story Illustration</text>
+          <text x="300" y="62" text-anchor="middle" fill="#64748B" font-size="11.5" font-weight="400" letter-spacing="0.01em">${croppedDesc}</text>
+        </g>
+      </svg>`;
+    };
+
     let apiResponse;
     let selectedImageModel = "gemini-2.5-flash-image";
+    let base64ImageBytes = "";
+
     try {
       apiResponse = await withRetry(() => getGoogleGenAI().models.generateContent({
         model: 'gemini-2.5-flash-image',
@@ -461,13 +503,27 @@ app.post("/api/generate-image", async (req, res) => {
           },
         },
       }));
-    } catch (imageErr: any) {
-      if (isAuthOrPermissionError(imageErr)) {
-        console.error("Directly aborting image generation loop due to configuration/license errors.");
-        throw imageErr;
+
+      const candidates = apiResponse.candidates;
+      if (candidates && candidates[0] && candidates[0].content && candidates[0].content.parts) {
+        for (const part of candidates[0].content.parts) {
+          if (part.inlineData) {
+            base64ImageBytes = part.inlineData.data;
+            break;
+          }
+        }
       }
 
-      console.warn("[Image Quota Fallback] gemini-2.5-flash-image failed or limited, trying gemini-3.1-flash-image...", imageErr?.message || imageErr);
+      if (!base64ImageBytes) {
+        throw new Error("Gemini image model did not return inline image bytes.");
+      }
+
+      console.log(`Illustration successfully generated using model: ${selectedImageModel}`);
+      return res.json({ imageUrl: `data:image/png;base64,${base64ImageBytes}` });
+
+    } catch (imageErr: any) {
+      console.warn("[Image Quota Fallback] gemini-2.5-flash-image failed, trying secondary model gemini-3.1-flash-image...", imageErr?.message || imageErr);
+      
       try {
         selectedImageModel = "gemini-3.1-flash-image";
         apiResponse = await withRetry(() => getGoogleGenAI().models.generateContent({
@@ -481,30 +537,80 @@ app.post("/api/generate-image", async (req, res) => {
             },
           },
         }));
+
+        const candidates = apiResponse.candidates;
+        if (candidates && candidates[0] && candidates[0].content && candidates[0].content.parts) {
+          for (const part of candidates[0].content.parts) {
+            if (part.inlineData) {
+              base64ImageBytes = part.inlineData.data;
+              break;
+            }
+          }
+        }
+
+        if (!base64ImageBytes) {
+          throw new Error("Gemini image model did not return inline image bytes.");
+        }
+
+        console.log(`Illustration successfully generated using model: ${selectedImageModel}`);
+        return res.json({ imageUrl: `data:image/png;base64,${base64ImageBytes}` });
+
       } catch (imageErr2: any) {
-        console.error("All image generation models failed after retry and cascade:", imageErr2);
-        throw imageErr2;
-      }
-    }
+        console.warn("[Image Quota Fallback] Both Imagen models returned resource limits or are unlicensed. Invoking Intelligent SVG Drawing Fallback via Gemini Text Engine...");
+        
+        try {
+          // Fall back to generating highly customized raw SVG tags using the perfectly working gemini-2.5-flash text model!
+          const fallbackModel = "gemini-2.5-flash";
+          const svgPrompt = `You are a professional children's book vector illustrator. Since the specialized image model has hit temporary service limits, we need you to design a high-quality, soothing, and beautifully aligned children's book illustration in standard SVG format.
 
-    console.log(`Illustration successfully generated using model: ${selectedImageModel}`);
+The illustration is for a sensitive, autistic child. It must have:
+1. Soothing, gentle pastel background color (e.g., soft lavender, sky blue, sage, peach, mint, pale gold).
+2. Clean, safe, modern minimalist vector styles. No aggressive, jagged, or chaotic shapes. Keep it simple, neat, structured and highly comforting.
+3. Incorporate the core components described here:
+   - Setting/Scene outline: "${illustrationDescription}"
+   - Main Character appearance to depict: "${characterAppearance || "A gentle child"}"
+   - Major Object / Toy / Interest to depict: "${objectAppearance || "Sensory interest/toy"}"
 
-    let base64ImageBytes = "";
-    const candidates = apiResponse.candidates;
-    if (candidates && candidates[0] && candidates[0].content && candidates[0].content.parts) {
-      for (const part of candidates[0].content.parts) {
-        if (part.inlineData) {
-          base64ImageBytes = part.inlineData.data;
-          break;
+Return ONLY a single valid raw <svg> string. Ensure the SVG has viewBox="0 0 800 450" (16:9 ratio) and is fully self-contained, valid XML with beautiful stylized shapes, paths, lines, or circles depicting a lovely abstract or structured representation of the scene.
+Make sure you preserve visual continuity of colors (e.g. if the character's clothing says "navy blue sweater with grass green hoops", use matching blues and greens!).
+Do NOT output any markdown (no \`\`\`xml or \`\`\`svg wrappers). Start your response exactly with "<svg" and close with "</svg>".`;
+
+          const fallbackResponse = await withRetry(() => getGoogleGenAI().models.generateContent({
+            model: fallbackModel,
+            contents: svgPrompt,
+          }));
+
+          let svgContent = fallbackResponse.text || "";
+          svgContent = svgContent.replace(/```[a-z]*\s*/gi, "").replace(/```\s*$/g, "").trim();
+          
+          const startIndex = svgContent.indexOf("<svg");
+          const endIndex = svgContent.lastIndexOf("</svg>");
+          if (startIndex !== -1 && endIndex !== -1) {
+            svgContent = svgContent.substring(startIndex, endIndex + 6);
+          }
+
+          if (svgContent.startsWith("<svg") && svgContent.includes("</svg>")) {
+            console.log("Vector fallback SVG generated successfully by Gemini text engine!");
+            const base64Bytes = Buffer.from(svgContent).toString("base64");
+            return res.json({ 
+              imageUrl: `data:image/svg+xml;base64,${base64Bytes}`,
+              isVectorFallback: true 
+            });
+          } else {
+            throw new Error("Invalid XML/SVG content returned from fallback model");
+          }
+        } catch (svgFallbackErr: any) {
+          console.error("Vector fallback SVG generation failed, invoking offline generic SVG generator:", svgFallbackErr);
+          const offlineSvg = generateOfflineFallbackSvg(illustrationDescription, characterAppearance || "", objectAppearance || "");
+          const base64Bytes = Buffer.from(offlineSvg).toString("base64");
+          return res.json({ 
+            imageUrl: `data:image/svg+xml;base64,${base64Bytes}`,
+            isVectorFallback: true,
+            isOfflineFallback: true
+          });
         }
       }
     }
-
-    if (!base64ImageBytes) {
-      throw new Error("Gemini image model did not return inline image bytes.");
-    }
-
-    return res.json({ imageUrl: `data:image/png;base64,${base64ImageBytes}` });
 
   } catch (error: any) {
     const errorDetails = handleGeminiError(error, "illustration generation");
