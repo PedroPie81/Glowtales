@@ -148,7 +148,7 @@ export default function CreateStory() {
 
       if (isStaticOnlyFallback) {
         // Redirect the request to our pre-compiled AI Studio container backend
-        const stableContainerBackendUrl = "https://ais-pre-n63434nzcpnc5bhqrly7ct-92816011625.europe-west2.run.app";
+        const stableContainerBackendUrl = "https://ais-dev-n63434nzcpnc5bhqrly7ct-92816011625.europe-west2.run.app";
         const fallbackUrl = `${stableContainerBackendUrl}${url}`;
         console.warn(`[API Dynamic Fallback] Static-only host detected (API returned HTML fallback). Delegating request to AI Studio container backend: ${fallbackUrl}`);
         
@@ -181,7 +181,7 @@ export default function CreateStory() {
             json.error.toLowerCase().includes("scope")
           );
           if (looksLikeApiKeyIssue) {
-            const stableContainerBackendUrl = "https://ais-pre-n63434nzcpnc5bhqrly7ct-92816011625.europe-west2.run.app";
+            const stableContainerBackendUrl = "https://ais-dev-n63434nzcpnc5bhqrly7ct-92816011625.europe-west2.run.app";
             const fallbackUrl = `${stableContainerBackendUrl}${url}`;
             console.warn(`[API Key Fallback] Deployed backend returned API key/scope error. Falling back directly to secure Cloud Run backend: ${fallbackUrl}`);
             try {
@@ -216,7 +216,7 @@ export default function CreateStory() {
         !hostname.includes("aistudio");
 
       if (isCustomStaticHost) {
-        const stableContainerBackendUrl = "https://ais-pre-n63434nzcpnc5bhqrly7ct-92816011625.europe-west2.run.app";
+        const stableContainerBackendUrl = "https://ais-dev-n63434nzcpnc5bhqrly7ct-92816011625.europe-west2.run.app";
         const fallbackUrl = `${stableContainerBackendUrl}${url}`;
         try {
           console.warn(`[API Dynamic Fallback] Connection failed. Delegating request to AI Studio container backend: ${fallbackUrl}`);
@@ -1034,17 +1034,26 @@ export default function CreateStory() {
                     </p>
                     <div className="bg-white/80 border border-orange-200/60 rounded-2xl p-4 text-xs text-slate-700 font-sans space-y-2 text-left">
                       {(window.location.hostname.includes("-pre") || window.location.hostname.includes("pre.run.app")) && (
-                        <div className="mb-4 bg-amber-50/80 border border-amber-200/60 text-amber-950 p-3.5 rounded-xl text-[11px] leading-relaxed space-y-1.5">
-                          <span className="font-semibold text-amber-850 flex items-center gap-1.5 text-xs">
-                            💡 Viewing from Shared App URL
+                        <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-950 p-4 rounded-2xl text-[11px] leading-relaxed space-y-2">
+                          <span className="font-bold text-amber-800 flex items-center gap-1.5 text-xs">
+                            ⚠️ Viewing from Shared App URL
                           </span>
-                          <p className="text-amber-900/80">
-                            You are currently viewing the app through the <strong>Shared App URL</strong> (-pre.run.app). 
-                            Because the Shared App is a static, separate production deployment snapshot, it does not have access to your private workspace Development Secrets.
+                          <p className="text-amber-900/90 font-sans">
+                            You are currently viewing the shared production preview snapshot (<strong>-pre.run.app</strong>). Because this environment snapshot is public, it does not have access to your private, secure development secrets in Google AI Studio.
                           </p>
-                          <p className="text-amber-900 font-medium">
-                            👉 Please switch to the <strong>Development App URL</strong> (-dev.run.app) or use the live preview frame on the right side of Google AI Studio to run the app with your active keys!
+                          <p className="font-semibold text-amber-900 pl-1 font-sans">
+                            👉 Please click the button below to switch to your direct <strong>Development App URL</strong> (-dev.run.app) to use your active Gemini API key:
                           </p>
+                          <div className="pt-1">
+                            <a 
+                              href={window.location.href.replace("-pre", "-dev")}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs transition hover:bg-amber-700 hover:text-white"
+                            >
+                              Open Live Development App 🚀
+                            </a>
+                          </div>
                         </div>
                       )}
 
