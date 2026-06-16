@@ -6,33 +6,49 @@
 export function searchAndStoreApiKey(): string | null {
   if (typeof window === "undefined") return null;
 
+  const potentialKeys = [
+    "apiKey", "apikey", "key", "api-key", "api_key",
+    "token", "accessToken", "access_token",
+    "geminiApiKey", "gemini_api_key", "gemini-api-key"
+  ];
+
   try {
     // 1. Try to read from URL Search Parameters (e.g., ?apiKey=... or ?token=...)
     const searchParams = new URLSearchParams(window.location.search);
-    const searchKey = searchParams.get("apiKey") || searchParams.get("apikey") || searchParams.get("token");
-    if (searchKey) {
-      sessionStorage.setItem("gemini_api_key", searchKey);
-      return searchKey;
+    for (const keyName of potentialKeys) {
+      const searchKey = searchParams.get(keyName);
+      if (searchKey && searchKey.trim()) {
+        const trimmed = searchKey.trim();
+        sessionStorage.setItem("gemini_api_key", trimmed);
+        console.log(`[GlowTales Auth Proxy] Recovered dynamic credential key from URL parameter [${keyName}]`);
+        return trimmed;
+      }
     }
 
     // 2. Try to read from Hash parameters
     const hash = window.location.hash;
     if (hash && hash.startsWith("#")) {
       const hashParams = new URLSearchParams(hash.substring(1));
-      const hashKey = hashParams.get("apiKey") || hashParams.get("apikey") || hashParams.get("token");
-      if (hashKey) {
-        sessionStorage.setItem("gemini_api_key", hashKey);
-        return hashKey;
+      for (const keyName of potentialKeys) {
+        const hashKey = hashParams.get(keyName);
+        if (hashKey && hashKey.trim()) {
+          const trimmed = hashKey.trim();
+          sessionStorage.setItem("gemini_api_key", trimmed);
+          console.log(`[GlowTales Auth Proxy] Recovered dynamic credential key from Anchor hash [${keyName}]`);
+          return trimmed;
+        }
       }
     }
   } catch (err) {
-    console.warn("[Auth Linker] Failed parsing window location parameters:", err);
+    console.warn("[GlowTales Auth] Failed parsing window location parameters:", err);
   }
 
   // 3. Fallback to storage
   try {
     const stored = sessionStorage.getItem("gemini_api_key");
-    if (stored) return stored;
+    if (stored && stored.trim()) {
+      return stored.trim();
+    }
   } catch (err) {
     // Ignore restricted storage issues in private sessions
   }

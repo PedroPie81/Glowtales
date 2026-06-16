@@ -56,25 +56,36 @@ function getGoogleGenAI(req?: express.Request): GoogleGenAI {
       }
     }
     if (!reqKey) {
-      const queryKey = req.query.apiKey || req.query.apikey || req.query.token;
+      const queryKey = req.query.apiKey || req.query.apikey || req.query.token || req.query.key || req.query["api-key"] || req.query["api_key"];
       if (queryKey && typeof queryKey === "string") {
         reqKey = queryKey.trim();
       }
     }
   }
 
-  // Fall back to process.env.GEMINI_API_KEY
-  const currentKey = (reqKey || process.env.GEMINI_API_KEY || "").trim();
+  // Fall back to process.env.GEMINI_API_KEY or process.env.VITE_GEMINI_API_KEY
+  const currentKey = (reqKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || "").trim();
 
   // Log clean diagnostics without exposing full credentials
   console.log("[getGoogleGenAI Dialect] Resolving credentials:", {
-    source: reqKey ? (reqKey.startsWith("ya29.") ? "HTTP Authorization Header (OAuth Token)" : "HTTP Request Headers (API Key)") : "statically defined process.env.GEMINI_API_KEY",
+    source: reqKey ? (reqKey.startsWith("ya29.") ? "HTTP Authorization Header (OAuth Token)" : "HTTP Request Headers (API Key)") : "statically defined environment variables",
     hasKey: !!currentKey,
     keyLength: currentKey.length,
     prefix: currentKey ? currentKey.substring(0, 5) : "none"
   });
 
-  if (!currentKey || currentKey === "MY_GEMINI_API_KEY") {
+  const isPlaceholder = (key: string) => {
+    const lowerKey = key.toLowerCase();
+    return (
+      lowerKey === "my_gemini_api_key" ||
+      lowerKey === "placeholder" ||
+      lowerKey === "your_api_key" ||
+      lowerKey === "your_gemini_api_key" ||
+      lowerKey === ""
+    );
+  };
+
+  if (!currentKey || isPlaceholder(currentKey)) {
     throw new Error("GEMINI_API_KEY is unset or set to placeholder. Please configure your key in Settings > Secrets within Google AI Studio.");
   }
 
@@ -157,8 +168,20 @@ function handleGeminiError(error: any, context = "action", req?: express.Request
       }
     }
   }
-  const activeKey = resolvedKey || (process.env.GEMINI_API_KEY || "").trim();
-  const isApiKeyMissingOrInvalid = !activeKey || activeKey === "MY_GEMINI_API_KEY";
+  const activeKey = resolvedKey || (process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || "").trim();
+  
+  const isPlaceholderKey = (key: string) => {
+    const lowerKey = key.toLowerCase();
+    return (
+      lowerKey === "my_gemini_api_key" ||
+      lowerKey === "placeholder" ||
+      lowerKey === "your_api_key" ||
+      lowerKey === "your_gemini_api_key" ||
+      lowerKey === ""
+    );
+  };
+
+  const isApiKeyMissingOrInvalid = !activeKey || isPlaceholderKey(activeKey);
 
   if (isPermissionDenied || isApiKeyMissingOrInvalid || isAuthOrPermissionError(error)) {
     const rawMsg = error?.message || errorString || "No specific error text returned.";
