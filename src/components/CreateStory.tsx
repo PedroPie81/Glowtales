@@ -46,6 +46,7 @@ export default function CreateStory() {
   const [story, setStory] = useState<StoryResult | null>(null);
   const [coverImageLoading, setCoverImageLoading] = useState(false);
   const [errorState, setErrorState] = useState<{ message: string; details?: string } | null>(null);
+  const [tempApiKey, setTempApiKey] = useState("");
 
   // 4. Bookshelf list of stories stored in localStorage
   const [bookshelf, setBookshelf] = useState<StoryResult[]>([]);
@@ -580,21 +581,66 @@ export default function CreateStory() {
 
           {/* 2. Error Panel */}
           {errorState && !isGenerating && (
-            <div className="bg-red-50/50 border border-red-200 rounded-3xl p-6 text-center" id="generator-error">
-              <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-3" />
-              <h3 className="text-md font-bold text-red-950 mb-1">Could Not Connect To Storyteller</h3>
-              <p className="text-red-900/80 text-xs mb-3 max-w-md mx-auto">{errorState.message}</p>
+            <div className="bg-[#FAF5EE] border border-[#EADBCC] rounded-3xl p-8 text-center" id="generator-error">
+              <AlertCircle className="h-10 w-10 text-amber-800 mx-auto mb-3" />
+              <h3 className="text-md font-bold text-amber-950 mb-1 font-display">Could Not Connect To Storyteller</h3>
+              <p className="text-amber-900/85 text-xs mb-4 max-w-md mx-auto">{errorState.message}</p>
+              
               {errorState.details && (
-                <div className="bg-white/80 p-3 rounded-2xl text-[10px] text-red-950/80 font-mono mb-4 text-left border border-red-100 max-h-24 overflow-y-auto">
+                <div className="bg-white/90 p-4 rounded-2xl text-[10px] sm:text-xs text-[#5D4E41] font-mono mb-4 text-left border border-[#EDE4D9] max-h-24 overflow-y-auto leading-relaxed">
                   {errorState.details}
                 </div>
               )}
-              <button
-                onClick={() => setErrorState(null)}
-                className="cursor-pointer bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs py-2 px-4 rounded-xl active:scale-95 transition"
-              >
-                Clear Notice
-              </button>
+
+              {/* Dynamic API Key secure injector form for standalone website mode */}
+              {(errorState.message.toLowerCase().includes("api key") || 
+                errorState.message.toLowerCase().includes("unauthorized") ||
+                errorState.message.toLowerCase().includes("scopes") ||
+                (errorState.details && errorState.details.toLowerCase().includes("api_key")) ||
+                (errorState.details && errorState.details.toLowerCase().includes("api key"))) && (
+                <div className="bg-[#FAF0E6] border border-[#E3D4C3] rounded-2xl p-5 mb-5 text-left space-y-3" id="fallback-api-key-panel">
+                  <h4 className="text-xs font-bold text-[#6B5138] uppercase tracking-wider">🌟 Standalone Website Helper</h4>
+                  <p className="text-[#6B5A4B] text-[11px] leading-relaxed">
+                    Because this is the public-facing, shared website URL, Google AI Studio secures your private, billable administrative Key. If you wish to play directly on this standalone link, please paste your <strong>Gemini API Key</strong> below to establish a secure browser-side connection:
+                  </p>
+                  <p className="text-[10px] text-[#A6937C] font-semibold italic">
+                    🔓 Stored exclusively inside your personal browser's local sessionStorage (never shared or saved to any backend database).
+                  </p>
+                  <div className="flex gap-2 mt-2">
+                    <input
+                      type="password"
+                      placeholder="Paste your Gemini API Key (AIzaSy...)"
+                      value={tempApiKey}
+                      onChange={(e) => setTempApiKey(e.target.value)}
+                      className="bg-white border border-[#DDD3C5] rounded-xl px-3 py-2 text-xs text-[#5D4E41] w-full focus:outline-hidden focus:ring-1 focus:ring-[#C5965E] font-mono shadow-inner"
+                      id="standalone-api-key-input"
+                    />
+                    <button
+                      onClick={() => {
+                        if (tempApiKey.trim()) {
+                          sessionStorage.setItem("gemini_api_key", tempApiKey.trim());
+                          console.log("[GlowTales Auth Proxy] Activating manual public API key bypass");
+                          setErrorState(null);
+                        }
+                      }}
+                      disabled={!tempApiKey.trim()}
+                      className="bg-[#C5965E] hover:bg-[#B3834D] disabled:opacity-50 text-white font-bold text-xs px-4 rounded-xl cursor-pointer active:scale-95 transition whitespace-nowrap"
+                      id="save-api-key-btn"
+                    >
+                      Save Key
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={() => setErrorState(null)}
+                  className="cursor-pointer bg-[#F5EFE6] hover:bg-[#EADBCC] text-[#6B5138] border border-[#EADBCC] font-bold text-xs py-2 px-4 rounded-xl active:scale-95 transition"
+                >
+                  Clear Notice
+                </button>
+              </div>
             </div>
           )}
 
