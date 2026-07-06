@@ -40,11 +40,10 @@ export default function CreateStory() {
   // 2. Navigation / Tab Step inside Form
   const [activeFormStep, setActiveFormStep] = useState<"profile" | "pacing" | "theme">("profile");
 
-  // 3. Generation and Cover Image states
+  // 3. Generation states
   const [isGenerating, setIsGenerating] = useState(false);
   const [loadingMessageIdx, setLoadingMessageIdx] = useState(0);
   const [story, setStory] = useState<StoryResult | null>(null);
-  const [coverImageLoading, setCoverImageLoading] = useState(false);
   const [errorState, setErrorState] = useState<{ message: string; details?: string } | null>(null);
   const [tempApiKey, setTempApiKey] = useState("");
 
@@ -140,7 +139,6 @@ export default function CreateStory() {
     }
 
     setIsGenerating(true);
-    setCoverImageLoading(true);
     setErrorState(null);
     setStory(null);
     setCurrentPageIndex(0);
@@ -166,29 +164,6 @@ export default function CreateStory() {
       setStory(storyData);
       setIsGenerating(false);
 
-      // Step B: Generate front cover image sequentially
-      try {
-        const imageRes = await fetch("/api/generate-image", {
-          method: "POST",
-          headers: getAuthHeaders(),
-          body: JSON.stringify({
-            coverIllustrationPrompt: storyData.coverIllustrationPrompt,
-            characterAppearance: storyData.characterAppearance,
-          })
-        });
-
-        if (imageRes.ok) {
-          const imageData = await imageRes.json();
-          setStory(prev => prev ? { ...prev, coverImageUrl: imageData.imageUrl } : null);
-        } else {
-          console.warn("Cover image returned error code. Proceeding with beautiful text-based front cover frame.");
-        }
-      } catch (imgErr) {
-        console.error("Cover image generation crashed:", imgErr);
-      } finally {
-        setCoverImageLoading(false);
-      }
-
     } catch (err: any) {
       console.error(err);
       setErrorState({
@@ -196,7 +171,6 @@ export default function CreateStory() {
         details: err.details || "Check that your GEMINI_API_KEY is configured in Settings > Secrets or try again shortly."
       });
       setIsGenerating(false);
-      setCoverImageLoading(false);
     }
   };
 
@@ -232,10 +206,11 @@ export default function CreateStory() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start px-2">
         
         {/* LEFT COLUMN: Generation Form (span 5) */}
-        <div className="lg:col-span-5 bg-[#FAF6F0] border border-[#E9DFD0] rounded-3xl p-6 shadow-sm relative overflow-hidden" id="story-form-block">
-          
-          {/* Subtle wood-grain frame background effect */}
-          <div className="absolute top-0 left-0 right-0 h-2 bg-amber-700/80" />
+        {!story && (
+          <div className="lg:col-span-5 bg-[#FAF6F0] border border-[#E9DFD0] rounded-3xl p-6 shadow-sm relative overflow-hidden" id="story-form-block">
+            
+            {/* Subtle wood-grain frame background effect */}
+            <div className="absolute top-0 left-0 right-0 h-2 bg-amber-700/80" />
 
           <h2 className="text-xl font-bold font-display text-amber-900 mb-6 flex items-center justify-between">
             <span>📚 Story Book Builder</span>
@@ -553,9 +528,10 @@ export default function CreateStory() {
           </div>
 
         </div>
+        )}
 
-        {/* RIGHT COLUMN: Interactive Cozy Reader & Bookshelf (span 7) */}
-        <div className="lg:col-span-7 flex flex-col gap-8" id="comfort-display-frame">
+        {/* RIGHT COLUMN: Interactive Cozy Reader & Bookshelf (span 7 or 12) */}
+        <div className={`${story ? "lg:col-span-12 max-w-4xl mx-auto w-full" : "lg:col-span-7"} flex flex-col gap-8`} id="comfort-display-frame">
           
           {/* 1. Loading State */}
           {isGenerating && (
@@ -680,14 +656,25 @@ export default function CreateStory() {
             <div className="bg-[#FCFAF7] border border-[#ECCFBA] rounded-3xl p-5 md:p-7 shadow-xs relative" id="story-reader-module">
               
               {/* Reader Action Ribbon: Save to shelf & Custom font sizes */}
-              <div className="flex items-center justify-between border-b border-[#ECCFBA]/60 pb-4 mb-5 text-xs text-amber-900 font-sans">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#ECCFBA]/60 pb-4 mb-5 text-xs text-amber-900 font-sans">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setStory(null);
+                      setCurrentPageIndex(0);
+                    }}
+                    className="inline-flex cursor-pointer items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl px-3.5 py-2 font-bold transition active:scale-95 shadow-xs"
+                  >
+                    <Sparkles className="h-3.5 w-3.5 fill-white" />
+                    <span>Build Another Story</span>
+                  </button>
+
                   <button
                     onClick={handleAddToBookshelf}
                     className="inline-flex cursor-pointer items-center gap-1 bg-[#FAF6F0] hover:bg-amber-100 border border-[#E1D4C1] text-amber-900 rounded-xl px-3 py-2 font-bold transition active:scale-95"
                   >
                     <Heart className={`h-4.5 w-4.5 transition ${bookshelf.some(b => b.title === story.title) ? "text-red-500 fill-red-500" : "text-amber-800"}`} />
-                    <span>{bookshelf.some(b => b.title === story.title) ? "On Your Bookshelf! ❤️" : "Save to Bookshelf"}</span>
+                    <span>{bookshelf.some(b => b.title === story.title) ? "Saved! ❤️" : "Save to Bookshelf"}</span>
                   </button>
                 </div>
 
@@ -730,31 +717,39 @@ export default function CreateStory() {
                       className="flex flex-col md:flex-row gap-6 items-center"
                       id="storybook-cover-sheet"
                     >
-                      {/* Left Block: Hardcover Image Graphic */}
+                      {/* Left Block: Hardcover Cozy Graphic */}
                       <div className="w-full md:w-1/2 flex justify-center">
-                        <div className="relative w-full max-w-[270px] aspect-[3/4] rounded-2xl shadow-md border-r-8 border-amber-950/20 bg-gradient-to-tr from-[#FAF6F0] to-[#EADBC8] overflow-hidden flex items-center justify-center">
-                          {coverImageLoading ? (
-                            <div className="text-center p-6 space-y-3">
-                              <Loader2 className="h-8 w-8 text-amber-600 animate-spin mx-auto" />
-                              <span className="block text-[11px] font-bold text-amber-800 font-sans tracking-tight">Finishing hand-drawn cover art...</span>
+                        <div className="relative w-full max-w-[270px] aspect-[3/4] rounded-2xl shadow-xl border-r-8 border-amber-950/25 bg-gradient-to-tr from-[#3D2612] to-[#634021] text-amber-50 overflow-hidden flex flex-col justify-between p-6 text-center border-l border-t border-b border-amber-800/20">
+                          {/* Top Border & Star */}
+                          <div className="border-b border-amber-400/20 pb-4 flex flex-col items-center">
+                            <Sparkle className="h-6 w-6 text-amber-400 fill-amber-300/80 mb-1 animate-pulse" />
+                            <span className="text-[10px] uppercase tracking-widest text-amber-300 font-bold">GlowTales Bedtime Book</span>
+                          </div>
+
+                          {/* Center Title and child's name */}
+                          <div className="space-y-3 my-auto">
+                            <h4 className="text-base sm:text-lg font-extrabold font-display leading-tight text-amber-100 italic px-2">
+                              {story.title}
+                            </h4>
+                            <div className="w-16 h-[1.5px] bg-amber-400/40 mx-auto" />
+                            <p className="text-[11px] font-serif text-amber-200/90 tracking-wide">
+                              Especially for <span className="font-bold text-amber-100">{formData.name}</span>
+                            </p>
+                          </div>
+
+                          {/* Bottom design elements */}
+                          <div className="border-t border-amber-400/20 pt-4 flex justify-between items-center text-[10px] text-amber-300/70 font-mono">
+                            <span>EDITION I</span>
+                            <div className="flex gap-1">
+                              <span className="text-xs">✦</span>
+                              <span className="text-xs">✦</span>
+                              <span className="text-xs">✦</span>
                             </div>
-                          ) : story.coverImageUrl ? (
-                            <img
-                              src={story.coverImageUrl}
-                              alt="Cozy Personalized Cover"
-                              className="w-full h-full object-cover rounded-xl select-none"
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : (
-                            <div className="text-center p-5 space-y-2">
-                              {/* Classic vector stylized book placeholder */}
-                              <Sparkle className="h-10 w-10 text-amber-500 fill-amber-300 mx-auto animate-pulse" />
-                              <span className="block text-[10px] text-amber-800/70 font-sans font-medium">Vector Cover Fallback Active</span>
-                            </div>
-                          )}
+                            <span>UTC COZY</span>
+                          </div>
                           
                           {/* Book cover Spine accent layout */}
-                          <div className="absolute top-0 left-0 bottom-0 w-3 bg-amber-950/20" />
+                          <div className="absolute top-0 left-0 bottom-0 w-3 bg-amber-950/45" />
                         </div>
                       </div>
 
@@ -892,8 +887,8 @@ export default function CreateStory() {
                       {/* Cover spine ornament strip */}
                       <div className="absolute top-0 bottom-0 left-0 w-1.5 bg-amber-800/40 group-hover:bg-amber-800/80 transition" />
 
-                      {/* Small visual image cover frame if exists */}
-                      <div className="aspect-[3/4] w-full rounded-lg bg-[#FAF6F0] mb-2 overflow-hidden flex items-center justify-center border border-amber-900/10">
+                      {/* Small visual image cover frame */}
+                      <div className="aspect-[3/4] w-full rounded-lg bg-gradient-to-tr from-[#3D2612] to-[#634021] mb-2 overflow-hidden flex flex-col justify-between p-2.5 text-center border border-amber-900/30 relative shadow-3xs group-hover:shadow-xs transition">
                         {book.coverImageUrl ? (
                           <img
                             src={book.coverImageUrl}
@@ -901,7 +896,19 @@ export default function CreateStory() {
                             className="w-full h-full object-cover rounded-md"
                           />
                         ) : (
-                          <BookOpen className="h-6 w-6 text-amber-400 group-hover:scale-110 transition" />
+                          <>
+                            <div className="flex justify-center">
+                              <Sparkle className="h-3 w-3 text-amber-400 fill-amber-300" />
+                            </div>
+                            <span className="text-[9px] font-bold text-amber-100 leading-tight block truncate font-serif px-0.5">
+                              {book.title}
+                            </span>
+                            <div className="text-[8px] text-amber-300/70 font-sans tracking-tight">
+                              GlowTales
+                            </div>
+                            {/* Book Spine miniature */}
+                            <div className="absolute top-0 bottom-0 left-0 w-1.5 bg-amber-950/40" />
+                          </>
                         )}
                       </div>
 

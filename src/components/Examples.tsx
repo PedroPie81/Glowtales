@@ -3,6 +3,9 @@ import { EXAMPLES } from "../data";
 import { BookOpen, Sparkle, ChevronLeft, ChevronRight, Compass } from "lucide-react";
 import { motion } from "motion/react";
 
+import leoCoverImg from "../assets/images/leo_steam_train_1779270419498.png";
+import mayaCoverImg from "../assets/images/mayas_starry_night_1779270438533.png";
+
 export default function Examples() {
   const [activeStoryIdx, setActiveStoryIdx] = useState(0);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
@@ -176,34 +179,15 @@ export default function Examples() {
                 >
                   {/* Left Cover Mini Block Art drawing */}
                   <div className="w-full md:w-5/12 flex justify-center">
-                    <div className="relative w-full max-w-[210px] aspect-[3/4] rounded-2xl shadow-md border-r-8 border-amber-950/20 bg-gradient-to-tr from-[#FAF6F0] to-[#E3D0BA] overflow-hidden flex flex-col justify-between p-4 text-center">
-                      <div className="space-y-1">
-                        <span className="text-[7.5px] uppercase font-bold text-amber-700 tracking-wider">GlowTales Volume</span>
-                        <h4 className="text-[12px] font-extrabold text-amber-950 font-display line-clamp-2 leading-tight">
-                          {story.title}
-                        </h4>
-                      </div>
-                      
-                      {/* Stylized vector icons based on story type */}
-                      <div className="my-auto flex justify-center py-2">
-                        {story.id === "leo-trains" ? (
-                          <div className="h-16 w-16 bg-[#FEFAF4] border border-[#ECDCCB] rounded-full flex items-center justify-center shadow-3xs">
-                            <span className="text-3xl filter saturate-75">🚂</span>
-                          </div>
-                        ) : (
-                          <div className="h-16 w-16 bg-[#FEFAF4] border border-[#ECDCCB] rounded-full flex items-center justify-center shadow-3xs">
-                            <span className="text-3xl filter saturate-75">🌌</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="space-y-1">
-                        <div className="h-0.5 w-6 bg-amber-400 mx-auto" />
-                        <span className="text-[7px] font-bold text-amber-800/80 block">PRECISION READING</span>
-                      </div>
-
+                    <div className="relative w-full max-w-[210px] aspect-[3/4] rounded-2xl shadow-md border-r-8 border-amber-950/20 bg-[#FAF6F0] overflow-hidden flex flex-col justify-between text-center">
+                      <img 
+                        src={story.id === "leo-trains" ? leoCoverImg : mayaCoverImg} 
+                        alt={story.title} 
+                        className="w-full h-full object-cover select-none"
+                        referrerPolicy="no-referrer"
+                      />
                       {/* Hardback spine decoration */}
-                      <div className="absolute top-0 bottom-0 left-0 w-2 bg-amber-950/15" />
+                      <div className="absolute top-0 bottom-0 left-0 w-3 bg-amber-950/25" />
                     </div>
                   </div>
 
