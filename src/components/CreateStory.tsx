@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { StoryInput, StoryResult } from "../types";
 import { getAuthHeaders } from "../lib/auth";
 import { 
@@ -22,6 +23,8 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 
 export default function CreateStory() {
+  const location = useLocation();
+
   // 1. Form Data State
   const [formData, setFormData] = useState<StoryInput>({
     name: "",
@@ -36,6 +39,19 @@ export default function CreateStory() {
     perspective: "Third-person",
     customAppearance: ""
   });
+
+  // Listen for initial router state (e.g. from homepage cards)
+  useEffect(() => {
+    if (location.state && typeof location.state === "object") {
+      const stateObj = location.state as Record<string, any>;
+      if (stateObj.specialInterests) {
+        setFormData(prev => ({
+          ...prev,
+          specialInterests: stateObj.specialInterests
+        }));
+      }
+    }
+  }, [location.state]);
 
   // 2. Navigation / Tab Step inside Form
   const [activeFormStep, setActiveFormStep] = useState<"profile" | "pacing" | "theme">("profile");

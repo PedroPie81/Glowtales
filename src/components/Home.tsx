@@ -1,8 +1,25 @@
-import { motion } from "motion/react";
-import { Sparkles, Heart, Brain, EyeOff, BookOpen, Compass, Sparkle } from "lucide-react";
+import { useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { 
+  Sparkles, 
+  Heart, 
+  Brain, 
+  EyeOff, 
+  BookOpen, 
+  Compass, 
+  Sparkle, 
+  Train, 
+  Orbit, 
+  Settings, 
+  ChevronDown, 
+  ChevronUp, 
+  HelpCircle 
+} from "lucide-react";
 import { Link } from "react-router-dom";
 
 export default function Home() {
+  const [openFaqId, setOpenFaqId] = useState<string | null>(null);
+
   const pillars = [
     {
       id: "lit-lang",
@@ -21,6 +38,56 @@ export default function Home() {
       icon: <EyeOff className="h-6 w-6 text-[#A56839]" />,
       title: "Low-Sensory Safe Flow",
       desc: "Orderly descriptive pacing and a reassuring, predictable plot. We generate a beautiful Book Cover Illustration to keep things visual while disabling inner-page images."
+    }
+  ];
+
+  const specialInterests = [
+    {
+      id: "trains",
+      title: "Steam Locomotives & Tracks",
+      desc: "The rhythmic chugging, orderly switches, and structured schedules of vintage trains provide comforting predictability.",
+      suggestedInterest: "Vintage steam locomotives, railway track switches, and structured train timetables",
+      icon: <Train className="h-6 w-6 text-emerald-800" />,
+      color: "bg-emerald-50/50 border-emerald-200/50 text-emerald-950 hover:bg-emerald-100/30"
+    },
+    {
+      id: "celestial",
+      title: "Celestial Star Charts",
+      desc: "Exploring planetary coordinates, repeating orbits, and cosmic distances offers an elegant and soothing sense of peaceful order.",
+      suggestedInterest: "Stellar constellations, detailed star charts, and peaceful repeating planetary orbits",
+      icon: <Orbit className="h-6 w-6 text-blue-800" />,
+      color: "bg-blue-50/50 border-blue-200/50 text-blue-950 hover:bg-blue-100/30"
+    },
+    {
+      id: "clockwork",
+      title: "Clockwork & Ticking Gears",
+      desc: "The physical mechanics of gears interlocking, clock faces, and rhythmic ticking sounds to settle active, hyper-focused minds.",
+      suggestedInterest: "Intricate clockwork gears, interlocking brass mechanics, and soft rhythmic ticking sounds",
+      icon: <Settings className="h-6 w-6 text-purple-800" />,
+      color: "bg-purple-50/50 border-purple-200/50 text-purple-950 hover:bg-purple-100/30"
+    }
+  ];
+
+  const faqs = [
+    {
+      id: "literal-lang",
+      question: "Why do autistic and neurodivergent children prefer literal language in stories?",
+      answer: "Many neurodivergent children process descriptions literally and may find idioms, sarcasm, or abstract metaphors confusing or cognitively demanding, especially when winding down. Using concrete, literal language reduces the processing load, creating a calm, predictable reading flow that helps them relax and settle for sleep."
+    },
+    {
+      id: "low-sensory",
+      question: "What is a low-stimulation or sensory-safe bedtime routine?",
+      answer: "A low-stimulation routine aims to lower sensory inputs. GlowTales supports this by keeping story text simple, using comfortable warm-color background themes, avoiding flashy or interactive inner-page animations, and prioritizing soothing storylines that avoid abrupt surprises, scary conflicts, or high-energy plot twists."
+    },
+    {
+      id: "special-interests",
+      question: "How does incorporating special interests help with sleep anxiety?",
+      answer: "Hyperfocus and deep passions are comforting anchors for neurodivergent minds. Integrating these interests—whether trains, deep-space constellations, or mechanics—into a story transforms the reading experience into a highly rewarding and familiar safe space, replacing bedtime anxiety with quiet comfort."
+    },
+    {
+      id: "is-it-free",
+      question: "Is GlowTales truly free and private?",
+      answer: "Yes, absolutely. GlowTales is a private, family-centric initiative created by a parent (Peter) to support kids with unique minds. There are no paywalls, hidden tracking tokens, or aggressive cookie popups. Your stories are processed using advanced private AI gateways on request, ensuring a completely safe and cozy environment."
     }
   ];
 
@@ -119,7 +186,91 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 3. Helper callout */}
+      {/* 3. Interactive Explore Themes Section */}
+      <section className="space-y-8" id="explore-interests-section">
+        <div className="text-center max-w-xl mx-auto space-y-3">
+          <span className="text-xs font-bold uppercase tracking-wider text-amber-700 bg-amber-50 border border-amber-200/40 px-2.5 py-1 rounded-full">Comforting Anchors</span>
+          <h2 className="text-2xl sm:text-3xl font-display font-bold text-amber-950">Explore Special Interest Themes</h2>
+          <p className="text-xs sm:text-sm text-amber-900/70">Click a special interest below to immediately build a sensory-friendly bedtime adventure featuring these reassuring mechanics.</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {specialInterests.map((interest) => (
+            <Link
+              key={interest.id}
+              to="/create"
+              state={{ specialInterests: interest.suggestedInterest }}
+              className={`flex flex-col text-left p-6 rounded-2xl border border-amber-900/15 bg-gradient-to-br ${interest.color} transition duration-300 hover:scale-[1.02] shadow-3xs hover:shadow-xs cursor-pointer group relative overflow-hidden`}
+              id={`explore-card-${interest.id}`}
+            >
+              <div className="flex justify-between items-start mb-4">
+                <div className="p-3 bg-white rounded-xl shadow-3xs">
+                  {interest.icon}
+                </div>
+                <span className="text-[10px] uppercase font-bold tracking-widest text-amber-800 bg-amber-100/40 px-2 py-0.5 rounded-md">Try This &rarr;</span>
+              </div>
+              <h3 className="text-md font-bold text-amber-950 font-display group-hover:text-amber-800 transition">{interest.title}</h3>
+              <p className="text-xs text-amber-900/75 font-serif mt-2 leading-relaxed flex-1">{interest.desc}</p>
+              
+              {/* Decorative sparkle */}
+              <Sparkle className="absolute bottom-3 right-3 h-4 w-4 text-amber-400/20 group-hover:text-amber-400/40 group-hover:scale-125 transition duration-500" />
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* 4. Frequently Asked Questions Section (FAQ Accordion) */}
+      <section className="space-y-8 max-w-3xl mx-auto" id="faqs-section">
+        <div className="text-center space-y-3">
+          <span className="text-xs font-bold uppercase tracking-wider text-amber-700 bg-amber-50 border border-amber-200/40 px-2.5 py-1 rounded-full">Guides & FAQ</span>
+          <h2 className="text-2xl sm:text-3xl font-display font-bold text-amber-950">Frequently Asked Questions</h2>
+          <p className="text-xs sm:text-sm text-amber-900/70">Expert insights on designing a soothing, literal bedtime story ritual for kids with unique minds.</p>
+        </div>
+
+        <div className="space-y-4">
+          {faqs.map((faq) => {
+            const isOpen = openFaqId === faq.id;
+            return (
+              <div 
+                key={faq.id}
+                className="border border-[#E9DFD0] rounded-2xl bg-[#FCFAF7] overflow-hidden transition duration-300"
+                id={`faq-item-${faq.id}`}
+              >
+                <button
+                  onClick={() => setOpenFaqId(isOpen ? null : faq.id)}
+                  className="w-full text-left px-6 py-4 flex items-center justify-between gap-4 font-bold text-amber-950 font-display hover:bg-[#FAF6F0] transition focus:outline-none"
+                >
+                  <span className="text-sm sm:text-base inline-flex items-center gap-2">
+                    <HelpCircle className="h-4.5 w-4.5 text-amber-700 shrink-0" />
+                    {faq.question}
+                  </span>
+                  {isOpen ? (
+                    <ChevronUp className="h-5 w-5 text-amber-700 shrink-0" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5 text-amber-700 shrink-0" />
+                  )}
+                </button>
+                <AnimatePresence initial={false}>
+                  {isOpen && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.25, ease: "easeInOut" }}
+                    >
+                      <div className="px-6 pb-5 pt-1 text-xs sm:text-sm text-amber-900/85 font-serif leading-relaxed border-t border-[#E9DFD0]/40">
+                        {faq.answer}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* 5. Helper callout */}
       <section className="bg-[#FAF6F0] rounded-3xl p-6 sm:p-10 border border-[#E9DFD0]/80 flex flex-col sm:flex-row items-center gap-6 sm:gap-10" id="callout-guide">
         <div className="p-4 bg-[#F5EAD9] rounded-2xl shadow-3xs shrink-0">
           <Compass className="h-10 w-10 text-amber-800" />
