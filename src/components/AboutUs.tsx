@@ -1,7 +1,19 @@
+import { useEffect } from "react";
 import { motion } from "motion/react";
 import { Heart, Landmark, Sparkles } from "lucide-react";
 
 export default function AboutUs() {
+  useEffect(() => {
+    document.title = "The Story of GlowTales: A Father's Dedication | GlowTales";
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) {
+      metaDesc.setAttribute(
+        "content",
+        "The story behind GlowTales, created by a parent with a broad history of neurodivergence and autism in his family. Dedicated to bringing free, private, comforting bedtime stories to children."
+      );
+    }
+  }, []);
+
   return (
     <div className="space-y-12 max-w-3xl mx-auto py-2 font-sans text-center" id="about-us-page">
       

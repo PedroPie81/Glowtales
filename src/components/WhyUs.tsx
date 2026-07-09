@@ -11,7 +11,7 @@ import {
   Sparkles,
   Heart
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 
 interface SEOKeyword {
@@ -23,6 +23,17 @@ interface SEOKeyword {
 
 export default function WhyUs() {
   const [activeKeywordFilter, setActiveKeywordFilter] = useState<string>("All");
+
+  useEffect(() => {
+    document.title = "Pure Accessibility & Free Bedtime Stories for Kids | GlowTales";
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) {
+      metaDesc.setAttribute(
+        "content",
+        "Compare GlowTales to typical commercialized book generator apps. Discover our pure accessibility promise: no subscriptions, no ads, 100% free forever, and complete privacy."
+      );
+    }
+  }, []);
 
   const seoPhrases: SEOKeyword[] = [
     {

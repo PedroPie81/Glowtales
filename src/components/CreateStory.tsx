@@ -42,6 +42,17 @@ export default function CreateStory() {
 
   // Listen for initial router state (e.g. from homepage cards)
   useEffect(() => {
+    document.title = "Craft a Personalized Bedtime Story | GlowTales";
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) {
+      metaDesc.setAttribute(
+        "content",
+        "Generate a custom, sensory-safe bedtime story designed specifically for your child. Tailor pacing, length, and special interest topics with concrete language structure."
+      );
+    }
+  }, []);
+
+  useEffect(() => {
     if (location.state && typeof location.state === "object") {
       const stateObj = location.state as Record<string, any>;
       if (stateObj.specialInterests) {

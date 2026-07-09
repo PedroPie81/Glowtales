@@ -1,7 +1,19 @@
+import { useEffect } from "react";
 import { motion } from "motion/react";
 import { BookOpen, Compass, Waves, CheckCircle2, Shield, HeartHandshake } from "lucide-react";
 
 export default function HowItWorks() {
+  useEffect(() => {
+    document.title = "The Science & Pediatric Foundations of Soothing Bedtime Stories | GlowTales";
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) {
+      metaDesc.setAttribute(
+        "content",
+        "We combine pediatric research on autism and neurodiversity with supportive prompt design. Learn how literal concrete language and strengths-affirming special interest integration build safe bedtime shelters."
+      );
+    }
+  }, []);
+
   const steps = [
     {
       title: "Literal & Concrete Language",

@@ -1,0 +1,6 @@
+# Robots.txt for GlowTales - Bedtime stories for neurodivergent kids
+User-agent: *
+Allow: /
+
+# Sitemap Location
+Sitemap: https://glowtales.org/sitemap.xml

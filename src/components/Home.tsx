@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   Sparkles, 
@@ -19,6 +19,17 @@ import { Link } from "react-router-dom";
 
 export default function Home() {
   const [openFaqId, setOpenFaqId] = useState<string | null>(null);
+
+  useEffect(() => {
+    document.title = "GlowTales | Cozy Bedtime Stories for Neurodivergent Kids";
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) {
+      metaDesc.setAttribute(
+        "content",
+        "GlowTales creates personalized, low-stimulation bedtime stories for neurodivergent, autistic, and ADHD children. Celebrate special interests with soothing, literal language and a safe, predictable story pacing."
+      );
+    }
+  }, []);
 
   const pillars = [
     {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { EXAMPLES } from "../data";
 import { BookOpen, Sparkle, ChevronLeft, ChevronRight, Compass } from "lucide-react";
 import { motion } from "motion/react";
@@ -10,6 +10,17 @@ export default function Examples() {
   const [activeStoryIdx, setActiveStoryIdx] = useState(0);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [readerFontSize, setReaderFontSize] = useState<"md" | "lg" | "xl">("lg");
+
+  useEffect(() => {
+    document.title = "Cozy Bookshelf & Story Examples | GlowTales";
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) {
+      metaDesc.setAttribute(
+        "content",
+        "Browse and read our pre-generated sensory-friendly storybooks. Discover how we weave special interests like locomotives and stellar constellations into peaceful narratives."
+      );
+    }
+  }, []);
 
   const story = EXAMPLES[activeStoryIdx];
 

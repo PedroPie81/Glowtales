@@ -1,0 +1,8 @@
+{
+  "name": "node-domexception",
+  "version": "1.0.0",
+  "description": "Native DOMException stub to resolve npm deprecation warning",
+  "main": "index.js",
+  "type": "commonjs",
+  "license": "MIT"
+}
