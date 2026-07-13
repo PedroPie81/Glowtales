@@ -81,12 +81,13 @@ function getGoogleGenAI(req?: express.Request): GoogleGenAI {
       lowerKey === "placeholder" ||
       lowerKey === "your_api_key" ||
       lowerKey === "your_gemini_api_key" ||
+      lowerKey === "undefined" ||
       lowerKey === ""
     );
   };
 
   if (!currentKey || isPlaceholder(currentKey)) {
-    throw new Error("GEMINI_API_KEY is unset or set to placeholder. Please configure your key in Settings > Secrets within Google AI Studio.");
+    throw new Error("GEMINI_API_KEY is unset or set to placeholder. If you are running inside Google AI Studio, please configure your key in Settings > Secrets. If you recently configured this on Vercel or another hosting platform, Vercel requires you to run a new deployment (redeploy) for newly added environment variables to be loaded into the active serverless environment.");
   }
 
   let client = aiClientsCache.get(currentKey);
@@ -396,12 +397,12 @@ Please structure your JSON response with:
   }
 });
 
-// Generate Book Cover Image Endpoint (Disabled for now as requested)
+// Generate Book Cover Image Endpoint
 app.post("/api/generate-image", async (req, res) => {
-  return res.status(400).json({ error: "Picture creation is disabled for now." });
+  await generate_image(req, res);
 });
 
-const disabled_generate_image = async (req: any, res: any) => {
+const generate_image = async (req: any, res: any) => {
   try {
     const { title, coverIllustrationPrompt, referencePhoto, characterAppearance } = req.body;
 
@@ -786,6 +787,87 @@ const disabled_generate_image = async (req: any, res: any) => {
 
           <text x="200" y="315" text-anchor="middle" fill="#0F172A" font-size="11" font-weight="bold" font-family="sans-serif" letter-spacing="1.5">TICKING CHRONOMETER ENGINE</text>
         `;
+      } else if (lowerPrompt.includes("badger") || lowerPrompt.includes("burrow") || lowerPrompt.includes("forest") || lowerPrompt.includes("wood") || lowerPrompt.includes("moss") || lowerPrompt.includes("tree") || lowerPrompt.includes("animal") || lowerPrompt.includes("maya") || lowerPrompt.includes("oak") || lowerPrompt.includes("nature")) {
+        // Cozy Forest / Badger Burrow underground scene
+        innerIllustrationSvg = `
+          <!-- Deep Forest/Burrow Background -->
+          <rect x="0" y="0" width="400" height="340" rx="24" fill="#0F1F15" />
+          <rect x="0" y="0" width="400" height="340" rx="24" fill="none" stroke="#2D4A36" stroke-width="2.5" />
+          
+          <!-- Tree hollow or burrow roots -->
+          <path d="M 0 340 L 0 100 Q 120 180 200 120 T 400 140 L 400 340 Z" fill="#1C130C" opacity="0.9" />
+          <!-- Roots arch over head -->
+          <path d="M -20 120 Q 150 40 320 110" stroke="#2D1C12" stroke-width="15" fill="none" stroke-linecap="round" />
+          <path d="M 120 60 Q 220 30 380 120" stroke="#1A110B" stroke-width="10" fill="none" stroke-linecap="round" />
+
+          <!-- Starry sky visible through tree top gaps -->
+          <g opacity="0.6">
+            <circle cx="80" cy="40" r="1.5" fill="#FFF" />
+            <circle cx="160" cy="25" r="2" fill="#FFF" />
+            <circle cx="280" cy="35" r="1" fill="#FFF" />
+            <!-- Glowing crescent moon -->
+            <path d="M 195 20 A 10 10 0 1 0 195 38 A 8 8 0 1 1 195 20" fill="#FEF08A" />
+          </g>
+
+          <!-- Soft fireflies in the grass -->
+          <g opacity="0.8">
+            <circle cx="50" cy="220" r="4" fill="#FEF08A" />
+            <circle cx="50" cy="220" r="12" fill="#FEF08A" opacity="0.15" />
+            <circle cx="340" cy="180" r="3" fill="#FEF08A" />
+            <circle cx="340" cy="180" r="10" fill="#FEF08A" opacity="0.1" />
+            <circle cx="110" cy="130" r="4" fill="#FEF08A" />
+          </g>
+
+          <!-- Cozy mossy bed inside the burrow -->
+          <rect x="80" y="220" width="240" height="75" rx="20" fill="#243E2B" stroke="#3D6A4B" stroke-width="2" />
+          <!-- Small plaid blanket -->
+          <path d="M 140 220 C 180 220 280 220 310 220 L 310 290 L 140 290 Z" fill="#C2410C" rx="5" />
+          <g stroke="#FDBA74" stroke-width="1.2" opacity="0.4">
+            <line x1="160" y1="220" x2="160" y2="290" />
+            <line x1="190" y1="220" x2="190" y2="290" />
+            <line x1="220" y1="220" x2="220" y2="290" />
+            <line x1="250" y1="220" x2="250" y2="290" />
+            <line x1="280" y1="220" x2="280" y2="290" />
+            
+            <line x1="140" y1="235" x2="310" y2="235" />
+            <line x1="140" y1="255" x2="310" y2="255" />
+            <line x1="140" y1="275" x2="310" y2="275" />
+          </g>
+
+          <!-- Cozy Hanging lantern casting soft yellow glow -->
+          <g transform="translate(200, 50)">
+            <line x1="0" y1="0" x2="0" y2="40" stroke="#475569" stroke-width="2" />
+            <!-- Lantern cap -->
+            <path d="M -15 40 L 15 40 L 10 33 L -10 33 Z" fill="#334155" />
+            <!-- Glass bulb -->
+            <rect x="-8" y="40" width="16" height="18" rx="4" fill="#FEF08A" stroke="#475569" stroke-width="1.5" />
+            <!-- Wire cage -->
+            <line x1="-8" y1="49" x2="8" y2="49" stroke="#334155" />
+            <line x1="0" y1="40" x2="0" y2="58" stroke="#334155" />
+            <!-- Radial Glow -->
+            <circle cx="0" cy="49" r="60" fill="url(#glow)" style="mix-blend-mode: screen;" />
+          </g>
+
+          <!-- Cute sleeping badger in moss bed -->
+          <g transform="translate(110, 200)">
+            <!-- Gray/black cozy curled-up badger body -->
+            <ellipse cx="50" cy="35" rx="42" ry="22" fill="#4B5563" />
+            <ellipse cx="32" cy="22" rx="18" ry="15" fill="#1F2937" />
+            <!-- Head with white badger stripes -->
+            <path d="M 8 10 C -2 16 -12 28 -2 30 C 8 32 18 20 18 10 Z" fill="#F3F4F6" />
+            <!-- Black stripes -->
+            <path d="M -2 18 Q 8 20 12 12" stroke="#1F2937" stroke-width="5" fill="none" stroke-linecap="round" />
+            <path d="M 6 24 Q 14 26 16 16" stroke="#1F2937" stroke-width="4.5" fill="none" stroke-linecap="round" />
+            <!-- Little pink nose -->
+            <circle cx="-2" cy="25" r="2.5" fill="#FDA4AF" />
+            <!-- Sleeping closed eye line -->
+            <path d="M 4 15 Q 8 17 11 14" fill="none" stroke="#111827" stroke-width="2" stroke-linecap="round" />
+            <!-- Soft cozy pillow -->
+            <ellipse cx="88" cy="42" rx="14" ry="8" fill="#FFF" opacity="0.9" />
+          </g>
+
+          <text x="200" y="315" text-anchor="middle" fill="#A7F3D0" font-size="11" font-weight="bold" font-family="sans-serif" letter-spacing="1.5">SAFE UNDERGROUND BURROW</text>
+        `;
       } else {
         // Default Sleeping Fox / Bedtime room scene
         innerIllustrationSvg = `
@@ -1022,13 +1104,14 @@ const disabled_generate_image = async (req: any, res: any) => {
       </svg>`;
     };
 
-    let apiResponse;
-    let selectedImageModel = "gemini-3.1-flash-image"; // Prefer premium model for supreme book illustrations
+    const timeout = (ms: number) => new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout")), ms));
+
     let base64ImageBytes = "";
 
     try {
-      console.log(`Generating premium cover illustration using primary model: ${selectedImageModel}`);
-      apiResponse = await withRetry(() => getGoogleGenAI(req).models.generateContent({
+      console.log("Generating premium cover illustration using primary model: gemini-3.1-flash-image with 512px size for fast performance");
+      
+      const apiResponsePromise = getGoogleGenAI(req).models.generateContent({
         model: 'gemini-3.1-flash-image',
         contents: {
           parts: partsPayload,
@@ -1036,10 +1119,16 @@ const disabled_generate_image = async (req: any, res: any) => {
         config: {
           imageConfig: {
             aspectRatio: "3:4", // Beautiful book portrait aspect ratio!
-            imageSize: "1K",    // Request high-resolution detail to prevent basic/blurry outputs
+            imageSize: "512px",  // Much faster generation to avoid timeout
           },
         },
-      }));
+      });
+
+      // Race the generation with a 12 second timeout
+      const apiResponse: any = await Promise.race([
+        apiResponsePromise,
+        timeout(12000)
+      ]);
 
       const candidates = apiResponse.candidates;
       if (candidates && candidates[0] && candidates[0].content && candidates[0].content.parts) {
@@ -1055,98 +1144,19 @@ const disabled_generate_image = async (req: any, res: any) => {
         throw new Error("No inline bytes returned from primary model");
       }
 
-      console.log(`Cover illustration successfully generated using primary model: ${selectedImageModel}`);
+      console.log("Cover illustration successfully generated using primary model.");
       return res.json({ imageUrl: `data:image/png;base64,${base64ImageBytes}` });
 
     } catch (imageErr: any) {
-      console.log("[Image Model Fallback] Premium model gemini-3.1-flash-image unavailable. Falling back to gemini-3.1-flash-lite-image...");
+      console.log("[Image Cover Fallback] Primary model timed out or failed. Generating high-quality customized vector book cover SVG instantly...", imageErr?.message || imageErr);
       
-      try {
-        selectedImageModel = "gemini-3.1-flash-lite-image";
-        apiResponse = await withRetry(() => getGoogleGenAI(req).models.generateContent({
-          model: 'gemini-3.1-flash-lite-image',
-          contents: {
-            parts: partsPayload,
-          },
-          config: {
-            imageConfig: {
-              aspectRatio: "3:4",
-            },
-          },
-        }));
-
-        const candidates = apiResponse.candidates;
-        if (candidates && candidates[0] && candidates[0].content && candidates[0].content.parts) {
-          for (const part of candidates[0].content.parts) {
-            if (part.inlineData) {
-              base64ImageBytes = part.inlineData.data;
-              break;
-            }
-          }
-        }
-
-        if (!base64ImageBytes) {
-          throw new Error("Gemini lite image model did not return inline image bytes.");
-        }
-
-        console.log(`Cover illustration successfully generated using fallback model: ${selectedImageModel}`);
-        return res.json({ imageUrl: `data:image/png;base64,${base64ImageBytes}` });
-
-      } catch (imageErr2: any) {
-        console.log("[Image Cover Fallback Info] Both Imagen models returned resource limits or are unlicensed. Generating high-quality customized vector book cover SVG...");
-        
-        try {
-          // Soft, soothing cover template
-          const fallbackModel = "gemini-3.5-flash";
-          const svgPrompt = `You are a professional children's book illustrator. Since our specialized image model is at full rate capacity right now, we need you to render a beautiful children's book portrait cover illustration in standard raw SVG format.
-
-The illustration is for a sensitive, autistic child and should depict:
-- Book Title: "${title || "A Cozy GlowTale"}"
-- Child attributes: "${characterAppearance || "A friendly child"}"
-- Setting/Theme description: "${coverIllustrationPrompt}"
-
-Please return ONLY a valid inline <svg> block. 
-1. The viewport must be exactly: viewBox="0 0 600 800" (portrait format).
-2. It should have a warm pale background plate, simple comforting lines, charming curves, circular highlights, glowing stars, representing the theme beautifully.
-3. It MUST display the title "${title || "A Cozy GlowTale"}" beautifully, centered at the top, in large readable elegant letters.
-4. No fluorescent or overwhelming shapes, no sharp edges. Comforting pastel hues.
-5. Keep the code fully compatible. No markdown wrappers (\`\`\`svg or \`\`\`xml). Start your response directly with "<svg" and close with "</svg>".`;
-
-          const fallbackResponse = await withRetry(() => getGoogleGenAI(req).models.generateContent({
-            model: fallbackModel,
-            contents: svgPrompt,
-          }));
-
-          let svgContent = fallbackResponse.text || "";
-          svgContent = svgContent.replace(/```[a-z]*\s*/gi, "").replace(/```\s*$/g, "").trim();
-          
-          const startIndex = svgContent.indexOf("<svg");
-          const endIndex = svgContent.lastIndexOf("</svg>");
-          if (startIndex !== -1 && endIndex !== -1) {
-            svgContent = svgContent.substring(startIndex, endIndex + 6);
-          }
-
-          if (svgContent.startsWith("<svg") && svgContent.includes("</svg>")) {
-            console.log("Vector cover illustration generated perfectly by Gemini Text Engine!");
-            const base64Bytes = Buffer.from(svgContent).toString("base64");
-            return res.json({ 
-              imageUrl: `data:image/svg+xml;base64,${base64Bytes}`,
-              isVectorFallback: true 
-            });
-          } else {
-            throw new Error("Invalid inline SVG content from cover model.");
-          }
-        } catch (svgCoverErr: any) {
-          console.log("[Image Fallback Info] Cover SVG generation failed, generating offline beautiful cover visual:", svgCoverErr?.message || svgCoverErr);
-          const offlineSvg = generateCozyCoverSvg(title || "A Cozy GlowTale", coverIllustrationPrompt);
-          const base64Bytes = Buffer.from(offlineSvg).toString("base64");
-          return res.json({ 
-            imageUrl: `data:image/svg+xml;base64,${base64Bytes}`,
-            isVectorFallback: true,
-            isOfflineFallback: true
-          });
-        }
-      }
+      const offlineSvg = generateCozyCoverSvg(title || "A Cozy GlowTale", coverIllustrationPrompt);
+      const base64Bytes = Buffer.from(offlineSvg).toString("base64");
+      return res.json({ 
+        imageUrl: `data:image/svg+xml;base64,${base64Bytes}`,
+        isVectorFallback: true,
+        isOfflineFallback: true
+      });
     }
 
   } catch (error: any) {

@@ -73,6 +73,8 @@ export default function CreateStory() {
   const [story, setStory] = useState<StoryResult | null>(null);
   const [errorState, setErrorState] = useState<{ message: string; details?: string } | null>(null);
   const [tempApiKey, setTempApiKey] = useState("");
+  const [isGeneratingCover, setIsGeneratingCover] = useState(false);
+  const [coverError, setCoverError] = useState<string | null>(null);
 
   // 4. Bookshelf list of stories stored in localStorage
   const [bookshelf, setBookshelf] = useState<StoryResult[]>([]);
@@ -191,13 +193,76 @@ export default function CreateStory() {
       setStory(storyData);
       setIsGenerating(false);
 
+      // Trigger cover image generation in the background asynchronously
+      generateCoverArtwork(storyData);
+
     } catch (err: any) {
       console.error(err);
+      const isAuthProblem = 
+        String(err.message || "").toLowerCase().includes("api key") || 
+        String(err.message || "").toLowerCase().includes("apikey") || 
+        String(err.message || "").toLowerCase().includes("unauthorized") || 
+        String(err.message || "").toLowerCase().includes("permission") || 
+        String(err.details || "").toLowerCase().includes("api key") || 
+        String(err.details || "").toLowerCase().includes("apikey") || 
+        String(err.details || "").toLowerCase().includes("api_key");
+
       setErrorState({
         message: err.message || "The story creation encountered a little quiet spot.",
-        details: err.details || "Check that your GEMINI_API_KEY is configured in Settings > Secrets or try again shortly."
+        details: err.details || (isAuthProblem 
+          ? "Your GEMINI_API_KEY is unset or invalid. Please configure your key in Google AI Studio under Settings > Secrets." 
+          : "The server could not complete the story generation. If you recently configured GEMINI_API_KEY on Vercel, please make sure you triggered a new Redeployment so Vercel can load the updated variables onto the live server.")
       });
       setIsGenerating(false);
+    }
+  };
+
+  // Generates dynamic cover artwork utilizing the Imagen / Gemini fallback API
+  const generateCoverArtwork = async (storyData: StoryResult) => {
+    setIsGeneratingCover(true);
+    setCoverError(null);
+    try {
+      const res = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          title: storyData.title,
+          coverIllustrationPrompt: storyData.coverIllustrationPrompt,
+          referencePhoto: formData.referencePhoto,
+          characterAppearance: storyData.characterAppearance
+        })
+      });
+
+      if (!res.ok) {
+        const errorJson = await res.json().catch(() => ({}));
+        throw new Error(errorJson.error || `Cover painting failed with status: ${res.status}`);
+      }
+
+      const imgData = await res.json();
+      if (imgData.imageUrl) {
+        const updatedStory = {
+          ...storyData,
+          coverImageUrl: imgData.imageUrl
+        };
+        setStory(updatedStory);
+
+        // Also update bookshelf item if it was already saved
+        setBookshelf(prevShelf => {
+          const updatedShelf = prevShelf.map(item => {
+            if (item.title === storyData.title) {
+              return { ...item, coverImageUrl: imgData.imageUrl };
+            }
+            return item;
+          });
+          localStorage.setItem("glowtales_library_v2", JSON.stringify(updatedShelf));
+          return updatedShelf;
+        });
+      }
+    } catch (err: any) {
+      console.error("Cover image generation error:", err);
+      setCoverError(err.message || "The cover painting encountered a little quiet spot.");
+    } finally {
+      setIsGeneratingCover(false);
     }
   };
 
@@ -747,25 +812,38 @@ export default function CreateStory() {
                       {/* Left Block: Hardcover Cozy Graphic */}
                       <div className="w-full md:w-1/2 flex justify-center">
                         <div className="relative w-full max-w-[270px] aspect-[3/4] rounded-2xl shadow-xl border-r-8 border-amber-950/25 bg-gradient-to-tr from-[#3D2612] to-[#634021] text-amber-50 overflow-hidden flex flex-col justify-between p-6 text-center border-l border-t border-b border-amber-800/20">
+                          
+                          {story.coverImageUrl && (
+                            <div className="absolute inset-0 w-full h-full z-0">
+                              <img
+                                src={story.coverImageUrl}
+                                alt="Cover Art"
+                                className="w-full h-full object-cover"
+                              />
+                              {/* Dark gradient overlay to ensure text legibility */}
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/45 to-black/70 z-10" />
+                            </div>
+                          )}
+
                           {/* Top Border & Star */}
-                          <div className="border-b border-amber-400/20 pb-4 flex flex-col items-center">
+                          <div className="border-b border-amber-400/20 pb-4 flex flex-col items-center z-20">
                             <Sparkle className="h-6 w-6 text-amber-400 fill-amber-300/80 mb-1 animate-pulse" />
                             <span className="text-[10px] uppercase tracking-widest text-amber-300 font-bold">GlowTales Bedtime Book</span>
                           </div>
 
                           {/* Center Title and child's name */}
-                          <div className="space-y-3 my-auto">
-                            <h4 className="text-base sm:text-lg font-extrabold font-display leading-tight text-amber-100 italic px-2">
+                          <div className="space-y-3 my-auto z-20">
+                            <h4 className="text-base sm:text-lg font-extrabold font-display leading-tight text-amber-100 italic px-2 drop-shadow-md">
                               {story.title}
                             </h4>
                             <div className="w-16 h-[1.5px] bg-amber-400/40 mx-auto" />
-                            <p className="text-[11px] font-serif text-amber-200/90 tracking-wide">
+                            <p className="text-[11px] font-serif text-amber-200/90 tracking-wide drop-shadow-sm">
                               Especially for <span className="font-bold text-amber-100">{formData.name}</span>
                             </p>
                           </div>
 
                           {/* Bottom design elements */}
-                          <div className="border-t border-amber-400/20 pt-4 flex justify-between items-center text-[10px] text-amber-300/70 font-mono">
+                          <div className="border-t border-amber-400/20 pt-4 flex justify-between items-center text-[10px] text-amber-300/70 font-mono z-20">
                             <span>EDITION I</span>
                             <div className="flex gap-1">
                               <span className="text-xs">✦</span>
@@ -776,7 +854,16 @@ export default function CreateStory() {
                           </div>
                           
                           {/* Book cover Spine accent layout */}
-                          <div className="absolute top-0 left-0 bottom-0 w-3 bg-amber-950/45" />
+                          <div className="absolute top-0 left-0 bottom-0 w-3 bg-amber-950/45 z-20" />
+
+                          {/* Painting/Generating overlay */}
+                          {isGeneratingCover && (
+                            <div className="absolute inset-0 bg-black/75 flex flex-col items-center justify-center p-4 z-30 backdrop-blur-xs">
+                              <Loader2 className="h-8 w-8 animate-spin text-amber-400 mb-2" />
+                              <span className="text-xs font-bold text-amber-200">Painting cover artwork...</span>
+                              <span className="text-[9px] text-amber-300/80 mt-1 text-center">Detailed watercolor with Gemini</span>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -806,8 +893,54 @@ export default function CreateStory() {
                             <strong>Consistent Hero style:</strong> {story.characterAppearance}
                           </div>
                         )}
+
+                        {/* Cover image generation status & controls */}
+                        <div className="pt-2">
+                          {coverError && (
+                            <div className="bg-orange-50 border border-orange-100 rounded-2xl p-3 text-xs text-orange-800 flex items-start gap-2 text-left animate-fade-in">
+                              <AlertCircle className="h-4 w-4 text-orange-600 shrink-0 mt-0.5" />
+                              <div>
+                                <p className="font-bold">Cover Painting Issue:</p>
+                                <p className="opacity-90 text-[11px] leading-relaxed">{coverError}</p>
+                                <button
+                                  onClick={() => generateCoverArtwork(story)}
+                                  className="mt-2 inline-flex items-center gap-1 cursor-pointer bg-orange-150 hover:bg-orange-200 text-orange-950 font-bold px-2.5 py-1 rounded-lg transition text-[10px]"
+                                >
+                                  <RefreshCw className="h-3 w-3" />
+                                  <span>Retry Painting</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {!story.coverImageUrl && !isGeneratingCover && !coverError && (
+                            <button
+                              onClick={() => generateCoverArtwork(story)}
+                              className="inline-flex items-center gap-1.5 cursor-pointer bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl px-4 py-2.5 transition active:scale-95 shadow-sm"
+                            >
+                              <Sparkles className="h-3.5 w-3.5 text-amber-200" />
+                              Paint Detailed Cover Art
+                            </button>
+                          )}
+
+                          {story.coverImageUrl && !isGeneratingCover && (
+                            <div className="flex flex-col sm:flex-row items-center gap-3">
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">
+                                ✓ Custom Cover Art Painted
+                              </span>
+                              <button
+                                onClick={() => generateCoverArtwork(story)}
+                                className="inline-flex items-center gap-1 cursor-pointer text-[10.5px] font-bold text-amber-700 hover:text-amber-900 underline"
+                                title="Regenerate Cover Artwork"
+                              >
+                                <RefreshCw className="h-3 w-3" />
+                                <span>Repaint Cover Art</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
                         
-                        <p className="text-[#C5A384] text-[11px] font-sans font-medium">
+                        <p className="text-[#C5A384] text-[11px] font-sans font-medium pt-2">
                           👉 Press Next Page below to start reading the chapter!
                         </p>
                       </div>
