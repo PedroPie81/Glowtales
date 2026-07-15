@@ -18,7 +18,10 @@ import {
   Camera,
   Layers,
   Sparkle,
-  Loader2
+  Loader2,
+  Maximize2,
+  Eye,
+  X
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -75,6 +78,7 @@ export default function CreateStory() {
   const [tempApiKey, setTempApiKey] = useState("");
   const [isGeneratingCover, setIsGeneratingCover] = useState(false);
   const [coverError, setCoverError] = useState<string | null>(null);
+  const [isEnlargedCoverOpen, setIsEnlargedCoverOpen] = useState(false);
 
   // 4. Bookshelf list of stories stored in localStorage
   const [bookshelf, setBookshelf] = useState<StoryResult[]>([]);
@@ -825,6 +829,16 @@ export default function CreateStory() {
                             </div>
                           )}
 
+                          {story.coverImageUrl && !isGeneratingCover && (
+                            <button
+                              onClick={() => setIsEnlargedCoverOpen(true)}
+                              className="absolute top-3 right-3 z-30 p-2 rounded-full bg-black/55 hover:bg-black/80 text-amber-100 hover:text-white transition-all active:scale-95 border border-amber-300/10 shadow-sm"
+                              title="Enlarge Clean Cover Art (Without Overlaid Text)"
+                            >
+                              <Maximize2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+
                           {/* Top Border & Star */}
                           <div className="border-b border-amber-400/20 pb-4 flex flex-col items-center z-20">
                             <Sparkle className="h-6 w-6 text-amber-400 fill-amber-300/80 mb-1 animate-pulse" />
@@ -928,13 +942,23 @@ export default function CreateStory() {
                               <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">
                                 ✓ Custom Cover Art Painted
                               </span>
+                              
+                              <button
+                                onClick={() => setIsEnlargedCoverOpen(true)}
+                                className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-bold bg-amber-100 hover:bg-amber-200 text-amber-950 px-3.5 py-2 rounded-xl transition shadow-3xs active:scale-95"
+                                title="View pristine cover illustration without overlaid text"
+                              >
+                                <Eye className="h-3.5 w-3.5 text-amber-800" />
+                                <span>View Clean Artwork</span>
+                              </button>
+
                               <button
                                 onClick={() => generateCoverArtwork(story)}
                                 className="inline-flex items-center gap-1 cursor-pointer text-[10.5px] font-bold text-amber-700 hover:text-amber-900 underline"
                                 title="Regenerate Cover Artwork"
                               >
                                 <RefreshCw className="h-3 w-3" />
-                                <span>Repaint Cover Art</span>
+                                <span>Repaint</span>
                               </button>
                             </div>
                           )}
@@ -1103,6 +1127,55 @@ export default function CreateStory() {
         </div>
 
       </div>
+
+      {/* Pristine Clean Cover Art Modal */}
+      <AnimatePresence>
+        {isEnlargedCoverOpen && story && story.coverImageUrl && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md"
+            onClick={() => setIsEnlargedCoverOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 15 }}
+              transition={{ type: "spring", damping: 25, stiffness: 350 }}
+              className="relative max-w-lg w-full aspect-[3/4] bg-neutral-950 rounded-3xl overflow-hidden shadow-2xl border border-white/10"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Clean cover artwork with no writing across it */}
+              <img
+                src={story.coverImageUrl}
+                alt="Enlarged Pristine Cover Art"
+                className="w-full h-full object-cover select-none"
+              />
+
+              {/* Close Button */}
+              <button
+                onClick={() => setIsEnlargedCoverOpen(false)}
+                className="absolute top-4 right-4 z-50 p-2.5 rounded-full bg-black/60 hover:bg-black/80 text-white/90 hover:text-white transition active:scale-95 shadow-md border border-white/10"
+                title="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+
+              {/* Bottom Info Ribbon */}
+              <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-6 text-left">
+                <span className="text-[10px] tracking-widest font-bold text-amber-400 uppercase font-mono">Pristine Illustration Artwork</span>
+                <h4 className="text-base font-bold text-white mt-1 leading-tight">{story.title}</h4>
+                {story.characterAppearance && (
+                  <p className="text-neutral-300 text-xs mt-1 line-clamp-2 leading-relaxed">
+                    Style: {story.characterAppearance}
+                  </p>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );
